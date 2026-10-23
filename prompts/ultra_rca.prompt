@@ -1,0 +1,68 @@
+You are an expert site reliability engineer performing root cause analysis (RCA) on a microservice incident. Analyse the incident data below and produce a detailed, structured report.
+
+## Incident Metadata
+
+- **Incident ID:** {{INCIDENT_ID}}
+- **Submission ID:** {{SUBMISSION_ID}}
+- **Correlation strategy:** {{CORRELATION_STRATEGY}}
+- **Services involved:** {{SERVICES_INVOLVED}}
+- **Event window:** {{FIRST_EVENT_TIMESTAMP}} → {{LAST_EVENT_TIMESTAMP}}
+- **Total events analysed:** {{EVENT_COUNT}}
+
+## Service Topology
+
+```json
+{{TOPOLOGY_JSON}}
+```
+
+The topology shows directed edges between services (earlier failure → later failure). Node roles:
+- `root_cause` — originating service (in-degree 0 or earliest error)
+- `propagated_error` — service that failed because of the root cause
+- `symptom` — downstream observable effect
+- `unaffected` — service present but not involved in the incident
+
+## Classified Events (errors and anomalies only)
+
+{{CLASSIFIED_EVENTS}}
+
+Each entry: service | timestamp | level | error_type | message | role | category | anomaly_score
+
+## Full Event Log (all events, chronological)
+
+{{FULL_EVENTS}}
+
+---
+
+## Your task
+
+Perform a thorough root cause analysis. Think step by step:
+
+1. Identify the originating failure: which service, method, and error triggered the cascade?
+2. Trace how the failure propagated across services using the topology and timestamps.
+3. Assign a confidence score (0–100%) based on the quality and completeness of the evidence.
+4. Propose alternative hypotheses if the evidence is ambiguous.
+5. Summarise the cascade sequence as an ordered chain.
+
+Write your analysis as a clear, professional incident report. Include:
+- The root cause with supporting evidence from the logs
+- The cascade sequence explained step by step
+- How the topology graph reflects the failure propagation
+- What the confidence score reflects about the evidence quality
+- At least one alternative hypothesis
+
+After your prose analysis, output the following structured block. It MUST appear at the very end of your response, with no text after it.
+
+<ANALYSIS_JSON>
+{
+  "root_cause_service": "<service name>",
+  "root_cause_method": "<method or function name, or 'unknown'>",
+  "confidence_score": <float 0.0-1.0>,
+  "cascade_chain": [
+    {"step": 1, "service": "<service>", "error": "<error description>", "timestamp": "<ISO8601>"},
+    {"step": 2, "service": "<service>", "error": "<error description>", "timestamp": "<ISO8601>"}
+  ],
+  "alternative_hypotheses": [
+    {"hypothesis": "<description>", "confidence": <float 0.0-1.0>, "reason": "<why less likely>"}
+  ]
+}
+</ANALYSIS_JSON>

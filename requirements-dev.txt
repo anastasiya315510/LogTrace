@@ -1,0 +1,10 @@
+-r requirements.txt
+
+# ── Linting ───────────────────────────────────────────────────────────────────
+ruff==0.6.9              # fast Python linter + formatter (replaces flake8/black/isort)
+
+# ── Testing ───────────────────────────────────────────────────────────────────
+pytest==8.3.3            # test runner
+pytest-asyncio==0.24.0   # async test support (asyncio_mode = auto in pyproject.toml)
+anyio==4.6.0             # async testing utilities (ASGI lifespan in tests)
+respx==0.21.1            # mock httpx requests in unit tests (producer push mocking)

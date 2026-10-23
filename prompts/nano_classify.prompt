@@ -1,0 +1,60 @@
+You are a log event classifier for distributed microservice systems. Classify each log event in the batch below.
+
+
+## Input
+
+A JSON array of log events. Each event has:
+- `event_index`: integer index in this batch (0-based)
+- `service`: service name
+- `level`: log level (ERROR, WARN, INFO, DEBUG, CRITICAL)
+- `message`: log message text
+- `error_type`: error class name if present, else null
+- `stack_trace`: stack trace if present, else null
+
+## Events to classify
+
+{{EVENTS_JSON}}
+
+## Task
+
+For every event in the array, return exactly one classification object.
+
+### error_category options
+Choose the single best match:
+- `timeout` — connection timeout, read timeout, pool timeout, deadline exceeded
+- `connection_refused` — connection refused, unreachable, network error
+- `null_pointer` — NullPointerException, AttributeError on None, null dereference
+- `out_of_memory` — OOM, heap exhausted, memory limit exceeded
+- `authentication_failure` — auth failed, invalid token, permission denied, 401/403
+- `data_corruption` — data integrity error, checksum mismatch, parse failure
+- `resource_exhausted` — pool exhausted, thread pool full, rate limit exceeded, 429
+- `service_unavailable` — 503, upstream unavailable, circuit breaker open
+- `unknown` — does not fit any category above
+- `noise` — INFO or DEBUG events with no anomaly; normal operations
+
+### event_role options
+- `root_candidate` — ERROR/CRITICAL that is likely a root cause (no upstream error visible in this event)
+- `propagated_error` — ERROR/CRITICAL caused by another service failing (message mentions upstream)
+- `symptom` — WARN or observable side-effect of an upstream failure
+- `noise` — INFO/DEBUG or routine events that are not anomalies
+
+### anomaly_score
+Float 0.0–1.0:
+- 1.0 = CRITICAL/ERROR with stack trace and clear error_type
+- 0.7 = ERROR without stack trace
+- 0.5 = WARN
+- 0.1 = INFO/DEBUG
+
+## Output format
+
+Return ONLY a valid JSON array with exactly {{BATCH_SIZE}} objects. No prose, no markdown fences.
+
+[
+  {
+    "event_index": 0,
+    "error_category": "timeout",
+    "event_role": "root_candidate",
+    "anomaly_score": 1.0
+  },
+  ...
+]

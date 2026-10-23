@@ -1,0 +1,64 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nemotrace"
+version = "0.1.0"
+description = "AI-powered log intelligence for microservice environments"
+requires-python = ">=3.12"
+dependencies = [
+    # API
+    "fastapi==0.115.0",
+    "uvicorn[standard]==0.30.6",
+    "python-multipart==0.0.9",
+    "httpx==0.27.2",
+    # Config & validation
+    "pydantic==2.9.2",
+    "pydantic-settings==2.5.2",
+    # Database
+    "sqlalchemy[asyncio]==2.0.35",
+    "asyncpg==0.29.0",
+    "alembic==1.13.3",
+    # Queue & cache
+    "redis[hiredis]==5.1.0",
+    # Object storage
+    "boto3==1.35.34",
+    # AI
+    "openai==1.50.2",
+    "tavily-python==0.5.0",
+    # Portal
+    "streamlit==1.39.0",
+    "streamlit-agraph==0.0.45",
+    "weasyprint==62.3",
+    # Logging
+    "structlog==24.4.0",
+    # Log parsing
+    "python-dateutil==2.9.0",
+    "regex==2024.9.11",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff==0.6.9",
+    "pytest==8.3.3",
+    "pytest-asyncio==0.24.0",
+    "anyio==4.6.0",
+    "respx==0.21.1",
+    "httpx==0.27.2",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501", "B008"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["api", "core", "db", "stream_processor", "jobs"]

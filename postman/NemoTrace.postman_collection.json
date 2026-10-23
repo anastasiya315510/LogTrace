@@ -1,0 +1,1429 @@
+{
+  "info": {
+    "name": "NemoTrace API",
+    "description": "NemoTrace© — AI-powered log intelligence for microservice environments.\n\n**Auth:** All requests require `X-API-Key` header. Set the `api_key` variable in the active environment.\n\n**Quick start:**\n1. Import `NemoTrace.postman_environment.json` and set it as active.\n2. Set `api_key` to your key.\n3. Run the **End-to-End Demo Flow** folder in sequence — submission IDs and incident IDs chain automatically via post-response scripts.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      { "key": "key",   "value": "X-API-Key",    "type": "string" },
+      { "key": "value", "value": "{{api_key}}",   "type": "string" },
+      { "key": "in",    "value": "header",         "type": "string" }
+    ]
+  },
+  "variable": [
+    { "key": "base_url",      "value": "http://localhost:8000",  "type": "string", "description": "Override in environment for staging/prod" },
+    { "key": "api_key",       "value": "dev-key-change-me",       "type": "string", "description": "Set in environment, never commit a real key" },
+    { "key": "submission_id", "value": "",                        "type": "string", "description": "Auto-populated by ingest/submit requests" },
+    { "key": "incident_id",   "value": "",                        "type": "string", "description": "Auto-populated by list-incidents request" },
+    { "key": "connector_id",  "value": "",                        "type": "string", "description": "Auto-populated by list-connectors or create-connector requests" }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": ["// Collection-level: nothing needed here"]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Collection-level: assert no 5xx on any request",
+          "pm.test('No server error (5xx)', function () {",
+          "    pm.expect(pm.response.code).to.be.below(500);",
+          "});"
+        ]
+      }
+    }
+  ],
+  "item": [
+
+    {
+      "name": "Health",
+      "description": "Liveness and readiness probes. Use these in CI smoke tests after deployment.",
+      "item": [
+        {
+          "name": "Liveness — GET /health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/health", "host": ["{{base_url}}"], "path": ["health"] },
+            "description": "Returns 200 if the process is alive. No auth required (used by container orchestrator)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Body has status ok', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.status).to.eql('ok');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"status\": \"ok\" }"
+            }
+          ]
+        },
+        {
+          "name": "Readiness — GET /ready",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/ready", "host": ["{{base_url}}"], "path": ["ready"] },
+            "description": "Returns 200 if the API can reach PostgreSQL and Redis. Returns 503 if either dependency is down."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 503', function () {",
+                  "    pm.expect([200, 503]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('Body has checks object', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('checks');",
+                  "    pm.expect(body.checks).to.have.property('postgres');",
+                  "    pm.expect(body.checks).to.have.property('redis');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 Ready",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"status\": \"ready\", \"checks\": { \"postgres\": \"ok\", \"redis\": \"ok\" } }"
+            },
+            {
+              "name": "503 Degraded",
+              "status": "Service Unavailable",
+              "code": 503,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"status\": \"degraded\", \"checks\": { \"postgres\": \"ok\", \"redis\": \"unreachable\" } }"
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "Ingestion",
+      "description": "Two paths: **live push** (primary, used by microservices and log shippers) and **file upload** (secondary, for historical analysis).",
+      "item": [
+        {
+          "name": "Push Live Events — POST /api/v1/ingest",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/v1/ingest", "host": ["{{base_url}}"], "path": ["api","v1","ingest"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service\": \"payment-service\",\n  \"events\": [\n    {\n      \"timestamp\": \"2026-09-19T10:00:00.123Z\",\n      \"level\": \"ERROR\",\n      \"service\": \"payment-service\",\n      \"trace_id\": \"4bf92f3577b34da6a3ce929d0e0e4736\",\n      \"span_id\": \"00f067aa0ba902b7\",\n      \"message\": \"Connection pool exhausted after 30s\",\n      \"error_type\": \"PoolTimeoutError\",\n      \"stack_trace\": \"Traceback (most recent call last):\\n  File 'payment/db.py', line 42, in get_connection\\n    raise PoolTimeoutError('pool exhausted')\"\n    },\n    {\n      \"timestamp\": \"2026-09-19T10:00:00.456Z\",\n      \"level\": \"ERROR\",\n      \"service\": \"payment-service\",\n      \"trace_id\": \"4bf92f3577b34da6a3ce929d0e0e4736\",\n      \"span_id\": \"00f067aa0ba902b8\",\n      \"message\": \"Failed to process payment for order #8821\",\n      \"error_type\": \"PaymentProcessingError\"\n    }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Called by microservices or log shippers (Fluent Bit, Vector) on every log event. Writes directly to the per-service Redis Stream — no DB write in the hot path. The Stream Processor watches the stream and auto-triggers an incident when an anomaly pattern is detected.\n\n**Rate limit:** 5,000 events/second across all services combined."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response has accepted count', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('accepted');",
+                  "    pm.expect(body.accepted).to.be.a('number').and.to.be.above(0);",
+                  "});",
+                  "pm.test('Response time under 50ms', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(50);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 Accepted",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"accepted\": 2, \"dropped\": 0 }"
+            },
+            {
+              "name": "400 Malformed Payload",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"detail\": \"Field 'service' is required\" }"
+            },
+            {
+              "name": "429 Rate Limited",
+              "status": "Too Many Requests",
+              "code": 429,
+              "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Retry-After", "value": "1" }],
+              "body": "{ \"detail\": \"Rate limit exceeded. Retry after 1 second.\" }"
+            }
+          ]
+        },
+        {
+          "name": "Upload Historical Files — POST /api/v1/submissions",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/submissions", "host": ["{{base_url}}"], "path": ["api","v1","submissions"] },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": [],
+                  "description": "One or more .log, .txt, or .json files. Max 100 MB total, max 20 files."
+                },
+                {
+                  "key": "time_window_seconds",
+                  "value": "30",
+                  "type": "text",
+                  "description": "Sliding window width for time-window correlation (optional, default 30)"
+                }
+              ]
+            },
+            "description": "Upload historical log files for post-mortem analysis. Files are streamed to Nebius Object Storage — no memory buffering. Returns 202 immediately; analysis runs asynchronously. Poll `GET /submissions/{submission_id}` for status, or open the SSE stream endpoint."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 202 Accepted', function () { pm.response.to.have.status(202); });",
+                  "pm.test('Response has submission_id', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('submission_id');",
+                  "    pm.expect(body.submission_id).to.match(/^[0-9a-f-]{36}$/);",
+                  "    pm.collectionVariables.set('submission_id', body.submission_id);",
+                  "    console.log('submission_id saved:', body.submission_id);",
+                  "});",
+                  "pm.test('Status is received', function () {",
+                  "    pm.expect(pm.response.json().status).to.eql('received');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "202 Accepted",
+              "status": "Accepted",
+              "code": 202,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"submission_id\": \"a1b2c3d4-0000-0000-0000-000000000001\", \"status\": \"received\" }"
+            },
+            {
+              "name": "400 Invalid File",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"detail\": \"File 'app.exe' is not a text-based log file. Accepted MIME types: text/plain, application/json\" }"
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "Submissions",
+      "description": "Check the status and results of a submission. The `submission_id` variable is auto-set by the upload request.",
+      "item": [
+        {
+          "name": "Get Submission Status — GET /api/v1/submissions/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/submissions/{{submission_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","submissions","{{submission_id}}"]
+            },
+            "description": "Poll this to check processing status. Status transitions: `received → parsing → correlating → classifying → analysing → complete | failed | no_incidents`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response schema valid', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('submission_id');",
+                  "    pm.expect(body).to.have.property('status');",
+                  "    pm.expect(body).to.have.property('created_at');",
+                  "    const validStatuses = ['received','parsing','correlating','classifying','analysing','complete','failed','no_incidents'];",
+                  "    pm.expect(validStatuses).to.include(body.status);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 In Progress",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"submission_id\": \"a1b2c3d4-0000-0000-0000-000000000001\",\n  \"status\": \"classifying\",\n  \"incident_count\": 1,\n  \"created_at\": \"2026-09-19T10:00:00Z\"\n}"
+            },
+            {
+              "name": "200 Complete",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"submission_id\": \"a1b2c3d4-0000-0000-0000-000000000001\",\n  \"status\": \"complete\",\n  \"incident_count\": 1,\n  \"created_at\": \"2026-09-19T10:00:00Z\"\n}"
+            },
+            {
+              "name": "404 Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"detail\": \"Submission not found\" }"
+            }
+          ]
+        },
+        {
+          "name": "List Incidents — GET /api/v1/submissions/:id/incidents",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/submissions/{{submission_id}}/incidents",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","submissions","{{submission_id}}","incidents"]
+            },
+            "description": "Returns all incidents identified in this submission. A submission may produce more than one incident (e.g. two unrelated outages in the same log files).\n\nThe post-response script auto-saves the first incident's ID to `{{incident_id}}` for use in the Incidents folder."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response has incidents array', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('incidents');",
+                  "    pm.expect(body.incidents).to.be.an('array');",
+                  "});",
+                  "// Auto-save first incident_id for downstream requests",
+                  "const body = pm.response.json();",
+                  "if (body.incidents && body.incidents.length > 0) {",
+                  "    const id = body.incidents[0].incident_id;",
+                  "    pm.collectionVariables.set('incident_id', id);",
+                  "    console.log('incident_id saved:', id);",
+                  "    pm.test('First incident has required fields', function () {",
+                  "        const i = body.incidents[0];",
+                  "        pm.expect(i).to.have.property('incident_id');",
+                  "        pm.expect(i).to.have.property('status');",
+                  "        pm.expect(i).to.have.property('root_cause_service');",
+                  "        pm.expect(i).to.have.property('confidence_score');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"incidents\": [\n    {\n      \"incident_id\": \"b2c3d4e5-0000-0000-0000-000000000002\",\n      \"status\": \"complete\",\n      \"root_cause_service\": \"payment-service\",\n      \"confidence_score\": 0.87\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Stream Progress (SSE) — GET /api/v1/submissions/:id/stream",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "text/event-stream" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/submissions/{{submission_id}}/stream",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","submissions","{{submission_id}}","stream"]
+            },
+            "description": "Server-Sent Events stream for real-time progress updates. Each event is a JSON object: `{ step, progress_pct, message }`.\n\n**Note:** Postman does not render SSE streams interactively. Use `curl` or the Investigation Portal for live streaming:\n```\ncurl -N -H 'X-API-Key: {{api_key}}' \\\n  {{base_url}}/api/v1/submissions/{{submission_id}}/stream\n```\n\nExpected event sequence:\n```\ndata: {\"step\":\"parsing\",\"progress_pct\":10,\"message\":\"Parsing 3400 lines\"}\ndata: {\"step\":\"correlating\",\"progress_pct\":30,\"message\":\"Grouping events\"}\ndata: {\"step\":\"classifying\",\"progress_pct\":50,\"message\":\"Classifying 420 events\"}\ndata: {\"step\":\"analysing\",\"progress_pct\":75,\"message\":\"Calling Nemotron Ultra 253B\"}\ndata: {\"step\":\"fix_suggestions\",\"progress_pct\":90,\"message\":\"Querying Tavily\"}\ndata: {\"step\":\"complete\",\"progress_pct\":100,\"message\":\"Analysis complete\"}\n```"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Content-Type is event-stream', function () {",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.include('text/event-stream');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "Incidents",
+      "description": "Fetch the full root cause report, chat with NemoTrace about the incident, and export the report. The `incident_id` variable is auto-set by the List Incidents request.",
+      "item": [
+        {
+          "name": "Get Incident Report — GET /api/v1/incidents/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/incidents/{{incident_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","incidents","{{incident_id}}"]
+            },
+            "description": "Full root cause analysis report. Available once incident status is `complete`. Includes: service topology graph, cascade chain, Nemotron Ultra explanation, confidence score, alternative hypotheses, and Tavily fix suggestions."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Report schema valid', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('incident_id');",
+                  "    pm.expect(body).to.have.property('status');",
+                  "    pm.expect(body).to.have.property('services_involved');",
+                  "    pm.expect(body).to.have.property('service_topology');",
+                  "    pm.expect(body).to.have.property('root_cause_service');",
+                  "    pm.expect(body).to.have.property('confidence_score');",
+                  "    pm.expect(body).to.have.property('cascade_explanation');",
+                  "    pm.expect(body).to.have.property('cascade_chain');",
+                  "    pm.expect(body).to.have.property('fix_suggestions');",
+                  "});",
+                  "pm.test('Confidence score is 0-1 float', function () {",
+                  "    const score = pm.response.json().confidence_score;",
+                  "    pm.expect(score).to.be.a('number');",
+                  "    pm.expect(score).to.be.within(0, 1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 Complete Report",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"incident_id\": \"b2c3d4e5-0000-0000-0000-000000000002\",\n  \"status\": \"complete\",\n  \"services_involved\": [\"payment-service\", \"order-service\", \"api-gateway\"],\n  \"service_topology\": {\n    \"payment-service\": [\"order-service\"],\n    \"order-service\": [\"api-gateway\"]\n  },\n  \"root_cause_service\": \"payment-service\",\n  \"root_cause_method\": \"processPayment()\",\n  \"confidence_score\": 0.87,\n  \"cascade_explanation\": \"The payment-service exhausted its PostgreSQL connection pool after sustained high load. Order-service began receiving 503 responses from payment-service, causing order processing to fail. The api-gateway surfaced these as client-facing timeouts.\",\n  \"cascade_chain\": [\n    { \"service\": \"payment-service\", \"error\": \"PoolTimeoutError: connection pool exhausted\" },\n    { \"service\": \"order-service\",   \"error\": \"PaymentServiceUnavailable: upstream 503\" },\n    { \"service\": \"api-gateway\",     \"error\": \"GatewayTimeout: downstream order-service\" }\n  ],\n  \"alternative_hypotheses\": [\n    { \"service\": \"order-service\", \"confidence\": 0.09, \"explanation\": \"Possible memory leak causing slow response times\" }\n  ],\n  \"fix_suggestions\": [\n    {\n      \"source_title\": \"PostgreSQL connection pooling best practices\",\n      \"source_url\": \"https://www.postgresql.org/docs/current/runtime-config-connection.html\",\n      \"excerpt\": \"Increase max_connections or use PgBouncer to pool connections externally...\",\n      \"tavily_score\": 0.94,\n      \"query_type\": \"remediation\"\n    }\n  ]\n}"
+            },
+            {
+              "name": "200 Still Analysing",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"incident_id\": \"b2c3d4e5-0000-0000-0000-000000000002\",\n  \"status\": \"analysing\",\n  \"services_involved\": [\"payment-service\", \"order-service\"],\n  \"root_cause_service\": null,\n  \"confidence_score\": null\n}"
+            }
+          ]
+        },
+        {
+          "name": "Chat — POST /api/v1/incidents/:id/chat",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "text/event-stream" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/incidents/{{incident_id}}/chat",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","incidents","{{incident_id}}","chat"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"What would happen if we increased the PostgreSQL connection pool from 10 to 50?\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Ask Nemotron Ultra 253B a follow-up question about the incident. The full incident context (all events, classifications, prior Q&A turns) is included in the prompt. Response is streamed as SSE tokens.\n\n**Incident must be `complete`** before this endpoint is usable.\n\nExample questions:\n- `\"Which other services might be affected that are not in these logs?\"`\n- `\"Explain the cascade step by step as if I've never seen this codebase.\"`\n- `\"What monitoring alert would have caught this earlier?\"`\n\n**Note:** Postman buffers the full SSE response. For live token streaming use `curl -N` or the Investigation Portal."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Content-Type is event-stream', function () {",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.include('text/event-stream');",
+                  "});",
+                  "pm.test('400 if incident not complete', function () {",
+                  "    // This test only fires when status is 400",
+                  "    if (pm.response.code === 400) {",
+                  "        pm.expect(pm.response.json().detail).to.include('not complete');",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 SSE Answer Stream",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "text/event-stream" }],
+              "body": "data: {\"token\": \"Increasing\"}\ndata: {\"token\": \" the\"}\ndata: {\"token\": \" connection pool\"}\ndata: {\"token\": \" would reduce\"}\ndata: {\"token\": \" pool exhaustion...\"}\ndata: {\"done\": true, \"tokens_used\": 312}"
+            },
+            {
+              "name": "400 Incident Not Complete",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"detail\": \"Incident is not yet complete. Current status: analysing\" }"
+            }
+          ]
+        },
+        {
+          "name": "Export Markdown — GET /api/v1/incidents/:id/export?format=md",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/incidents/{{incident_id}}/export?format=md",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","incidents","{{incident_id}}","export"],
+              "query": [
+                { "key": "format", "value": "md", "description": "md = Markdown, pdf = PDF" }
+              ]
+            },
+            "description": "Download the full incident report as a Markdown file suitable for post-mortem documentation. Includes: service topology (as text), cascade chain, root cause explanation, confidence score, alternative hypotheses, and Tavily fix suggestions with links."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Content-Type is octet-stream', function () {",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.include('application/octet-stream');",
+                  "});",
+                  "pm.test('Content-Disposition has filename', function () {",
+                  "    const cd = pm.response.headers.get('Content-Disposition');",
+                  "    pm.expect(cd).to.include('attachment');",
+                  "    pm.expect(cd).to.include('.md');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Export PDF — GET /api/v1/incidents/:id/export?format=pdf",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/incidents/{{incident_id}}/export?format=pdf",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","incidents","{{incident_id}}","export"],
+              "query": [
+                { "key": "format", "value": "pdf", "description": "md = Markdown, pdf = PDF" }
+              ]
+            },
+            "description": "Download the full incident report as a PDF. Rendered server-side using WeasyPrint."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Content-Type is PDF', function () {",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.include('application/pdf');",
+                  "});",
+                  "pm.test('Body is non-empty', function () {",
+                  "    pm.expect(pm.response.responseSize).to.be.above(1000);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "End-to-End Demo Flow",
+      "description": "Run this folder as a **Collection Run** (Runner) to exercise the complete happy path in one click.\n\nEach request auto-chains to the next via post-response variable saves:\n1. Submit files → saves `submission_id`\n2. Poll status → waits for `complete`\n3. List incidents → saves `incident_id`\n4. Get report → validates full schema\n5. Chat → sends a follow-up question\n6. Export → downloads Markdown\n\n**Pre-requisite:** Upload two demo log files from `demo/payment-service.log` and `demo/order-service.log` (in the repository).",
+      "item": [
+        {
+          "name": "1 — Upload Demo Files",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/submissions", "host": ["{{base_url}}"], "path": ["api","v1","submissions"] },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "files", "type": "file", "src": ["demo/payment-service.log", "demo/order-service.log"], "description": "Demo log files from the repo /demo directory" },
+                { "key": "time_window_seconds", "value": "30", "type": "text" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 202', function () { pm.response.to.have.status(202); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('submission_id', body.submission_id);",
+                  "pm.test('submission_id saved', function () {",
+                  "    pm.expect(pm.collectionVariables.get('submission_id')).to.match(/^[0-9a-f-]{36}$/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "2 — Poll Until Complete",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/submissions/{{submission_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","submissions","{{submission_id}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// In Collection Runner: set iterations to 10, delay to 10000ms (10s)",
+                  "// to poll up to 100 seconds for completion.",
+                  "console.log('Polling submission:', pm.collectionVariables.get('submission_id'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "const terminalStatuses = ['complete', 'failed', 'no_incidents'];",
+                  "if (terminalStatuses.includes(body.status)) {",
+                  "    pm.test('Analysis complete', function () {",
+                  "        pm.expect(body.status).to.eql('complete');",
+                  "    });",
+                  "    postman.setNextRequest('3 — List Incidents');",
+                  "} else {",
+                  "    console.log('Still processing:', body.status, '— retrying...');",
+                  "    postman.setNextRequest('2 — Poll Until Complete');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "3 — List Incidents",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/submissions/{{submission_id}}/incidents",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","submissions","{{submission_id}}","incidents"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('At least one incident found', function () {",
+                  "    pm.expect(body.incidents.length).to.be.above(0);",
+                  "});",
+                  "pm.collectionVariables.set('incident_id', body.incidents[0].incident_id);",
+                  "console.log('incident_id saved:', body.incidents[0].incident_id);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "4 — Get Full Report",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/incidents/{{incident_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","incidents","{{incident_id}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Report is complete', function () {",
+                  "    pm.expect(body.status).to.eql('complete');",
+                  "});",
+                  "pm.test('Root cause identified', function () {",
+                  "    pm.expect(body.root_cause_service).to.be.a('string').and.not.empty;",
+                  "});",
+                  "pm.test('Confidence score present', function () {",
+                  "    pm.expect(body.confidence_score).to.be.within(0, 1);",
+                  "});",
+                  "pm.test('Fix suggestions present', function () {",
+                  "    pm.expect(body.fix_suggestions).to.be.an('array');",
+                  "});",
+                  "console.log('Root cause:', body.root_cause_service, '| Confidence:', Math.round(body.confidence_score * 100) + '%');"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "5 — Chat Follow-up",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "text/event-stream" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/incidents/{{incident_id}}/chat",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","incidents","{{incident_id}}","chat"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"What monitoring alert would have caught this incident 5 minutes earlier?\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "6 — Export Markdown",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/incidents/{{incident_id}}/export?format=md",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","incidents","{{incident_id}}","export"],
+              "query": [{ "key": "format", "value": "md" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Received a file', function () {",
+                  "    pm.expect(pm.response.headers.get('Content-Disposition')).to.include('attachment');",
+                  "});",
+                  "console.log('--- End-to-End Demo Flow PASSED ---');"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "Error Cases",
+      "description": "Verify that the API returns the correct error codes and bodies for invalid requests. Run these against the real server to confirm error handling is implemented.",
+      "item": [
+        {
+          "name": "Missing API Key — 401",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/submissions/{{submission_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","submissions","{{submission_id}}"]
+            },
+            "description": "Intentionally omits the X-API-Key header. Must return 401."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401 Unauthorized', function () { pm.response.to.have.status(401); });",
+                  "pm.test('Error body has detail', function () {",
+                  "    pm.expect(pm.response.json()).to.have.property('detail');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "401",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"detail\": \"Missing or invalid API key\" }"
+            }
+          ]
+        },
+        {
+          "name": "Non-existent Submission — 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/submissions/00000000-0000-0000-0000-000000000000",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","submissions","00000000-0000-0000-0000-000000000000"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404 Not Found', function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "404",
+              "status": "Not Found",
+              "code": 404,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"detail\": \"Submission not found\" }"
+            }
+          ]
+        },
+        {
+          "name": "Chat on Incomplete Incident — 400",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/incidents/00000000-0000-0000-0000-000000000000/chat",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","incidents","00000000-0000-0000-0000-000000000000","chat"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"question\": \"test\" }",
+              "options": { "raw": { "language": "json" } }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400 or 404', function () {",
+                  "    pm.expect([400, 404]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Invalid File Type — 400",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/submissions", "host": ["{{base_url}}"], "path": ["api","v1","submissions"] },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "files", "type": "file", "src": [], "description": "Attach a .exe or .png file here to trigger the 400" }
+              ]
+            },
+            "description": "Attach a binary file (.exe, .png, .zip) to verify the file type validator rejects it with 400."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400 Bad Request', function () { pm.response.to.have.status(400); });",
+                  "pm.test('Error mentions file type', function () {",
+                  "    const detail = pm.response.json().detail;",
+                  "    pm.expect(detail.toLowerCase()).to.satisfy(s => s.includes('type') || s.includes('mime') || s.includes('format'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "Demo Control",
+      "description": "Control the live cascade demo. These endpoints drive the `demo/producers/` services — start background traffic, trigger a cascade, check current demo phase, and reset state. Protected by the same `X-API-Key` header as all other endpoints.\n\n**Typical demo sequence:**\n1. `POST /demo/start` — producers begin normal background traffic\n2. Wait 30–60s — let judges see normal operation\n3. `POST /demo/cascade` — inject the payment-service cascade\n4. `GET /demo/status` — confirm cascade is running\n5. Watch the portal — Stream Processor auto-triggers within 60s\n6. `POST /demo/reset` — clean up between demo runs",
+      "item": [
+        {
+          "name": "Start Demo (Normal Traffic) — POST /demo/start",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/demo/start", "host": ["{{base_url}}"], "path": ["demo","start"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"services\": [\"payment-service\", \"order-service\", \"api-gateway\"],\n  \"normal_duration_seconds\": 60\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Instructs all producer containers to begin pushing normal background traffic (INFO/DEBUG/occasional WARN) for `normal_duration_seconds`. Use this to establish baseline activity before triggering the cascade.\n\nThe API publishes a `demo:command:start` message to the Redis pub/sub channel that all producer containers subscribe to.\n\n**Response:** Returns immediately with the demo session ID. Producers begin pushing within 1 second."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response has demo_session_id', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('demo_session_id');",
+                  "    pm.expect(body.phase).to.eql('normal');",
+                  "    pm.collectionVariables.set('demo_session_id', body.demo_session_id);",
+                  "    console.log('Demo started. Session:', body.demo_session_id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 Started",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"demo_session_id\": \"demo-2026-09-19T10:00:00Z\",\n  \"phase\": \"normal\",\n  \"services\": [\"payment-service\", \"order-service\", \"api-gateway\"],\n  \"message\": \"Normal traffic started. Call POST /demo/cascade to inject the failure.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Trigger Cascade — POST /demo/cascade",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/demo/cascade", "host": ["{{base_url}}"], "path": ["demo","cascade"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Injects the cascade failure scenario immediately, regardless of whether normal traffic is running.\n\n**What happens:**\n1. A shared `trace_id` (UUID4) is generated and published to all producers\n2. `payment-service` producer starts pushing `PoolTimeoutError` at ~1 error/2s\n3. `order-service` producer starts pushing `UpstreamTimeoutError` after 1.2s delay\n4. `api-gateway` producer starts pushing 503 errors after 2.8s delay\n5. Stream Processor detects ERROR spike and auto-triggers within 60s\n\nThe `trace_id` is shared across all three services so trace-ID correlation fires.\n\n**No manual action required after this call** — the system detects and analyses the cascade autonomously."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Cascade initiated', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.phase).to.eql('cascade');",
+                  "    pm.expect(body).to.have.property('trace_id');",
+                  "    pm.expect(body).to.have.property('expected_trigger_in_seconds');",
+                  "    console.log('CASCADE STARTED. trace_id:', body.trace_id);",
+                  "    console.log('Expected auto-trigger in', body.expected_trigger_in_seconds, 'seconds');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 Cascade Initiated",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"phase\": \"cascade\",\n  \"trace_id\": \"4bf92f3577b34da6a3ce929d0e0e4736\",\n  \"cascade_sequence\": [\n    { \"service\": \"payment-service\", \"delay_seconds\": 0,   \"error_type\": \"PoolTimeoutError\" },\n    { \"service\": \"order-service\",   \"delay_seconds\": 1.2, \"error_type\": \"UpstreamTimeoutError\" },\n    { \"service\": \"api-gateway\",     \"delay_seconds\": 2.8, \"error_type\": \"ServiceUnavailableError\" }\n  ],\n  \"expected_trigger_in_seconds\": 60,\n  \"message\": \"Cascade injected. Watch the Investigation Portal — Stream Processor will auto-trigger within 60s.\"\n}"
+            },
+            {
+              "name": "409 Cascade Already Running",
+              "status": "Conflict",
+              "code": 409,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"detail\": \"A cascade is already in progress. Call POST /demo/reset first.\", \"phase\": \"cascade\" }"
+            }
+          ]
+        },
+        {
+          "name": "Demo Status — GET /demo/status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/demo/status", "host": ["{{base_url}}"], "path": ["demo","status"] },
+            "description": "Returns the current state of the demo session: which phase is active, how many events have been pushed per service, whether the Stream Processor has triggered, and the current submission/incident IDs if analysis has started."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Status schema valid', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('phase');",
+                  "    pm.expect(['idle','normal','cascade','triggered','complete']).to.include(body.phase);",
+                  "    pm.expect(body).to.have.property('events_pushed');",
+                  "    pm.expect(body).to.have.property('auto_triggered');",
+                  "});",
+                  "const body = pm.response.json();",
+                  "if (body.submission_id) {",
+                  "    pm.collectionVariables.set('submission_id', body.submission_id);",
+                  "    console.log('Auto-triggered! submission_id:', body.submission_id);",
+                  "}",
+                  "console.log('Demo phase:', body.phase, '| Events pushed:', JSON.stringify(body.events_pushed));"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 Normal Phase",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"phase\": \"normal\",\n  \"events_pushed\": {\n    \"payment-service\": 42,\n    \"order-service\": 38,\n    \"api-gateway\": 51\n  },\n  \"auto_triggered\": false,\n  \"submission_id\": null,\n  \"incident_id\": null\n}"
+            },
+            {
+              "name": "200 Cascade Triggered",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"phase\": \"triggered\",\n  \"events_pushed\": {\n    \"payment-service\": 57,\n    \"order-service\": 48,\n    \"api-gateway\": 56\n  },\n  \"cascade_errors_pushed\": {\n    \"payment-service\": 10,\n    \"order-service\": 6,\n    \"api-gateway\": 3\n  },\n  \"auto_triggered\": true,\n  \"submission_id\": \"a1b2c3d4-0000-0000-0000-000000000001\",\n  \"incident_id\": null,\n  \"message\": \"Stream Processor triggered. Analysis in progress.\"\n}"
+            },
+            {
+              "name": "200 Idle",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"phase\": \"idle\",\n  \"events_pushed\": {},\n  \"auto_triggered\": false,\n  \"submission_id\": null,\n  \"incident_id\": null,\n  \"message\": \"No demo running. Call POST /demo/start to begin.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Reset Demo — POST /demo/reset",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/demo/reset", "host": ["{{base_url}}"], "path": ["demo","reset"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clear_redis_streams\": true,\n  \"clear_db_submissions\": false\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Stops all producer activity, resets demo phase to `idle`, and optionally clears Redis Streams and/or DB submissions created during the demo run.\n\n- `clear_redis_streams: true` — flushes all `stream:ingest:*` keys so the Stream Processor starts with a clean window (recommended between demo runs)\n- `clear_db_submissions: false` — keeps past submissions and incidents in the DB so judges can browse previous runs in the portal\n\n**Use between demo runs** to prevent the Stream Processor debounce from blocking a re-trigger."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Phase reset to idle', function () {",
+                  "    pm.expect(pm.response.json().phase).to.eql('idle');",
+                  "});",
+                  "pm.collectionVariables.set('submission_id', '');",
+                  "pm.collectionVariables.set('incident_id', '');",
+                  "console.log('Demo reset. Ready for next run.');"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 Reset",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"phase\": \"idle\",\n  \"redis_streams_cleared\": true,\n  \"db_submissions_cleared\": false,\n  \"message\": \"Demo reset. Call POST /demo/start to begin a new run.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Live Demo Run — Collection Run Sequence",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/demo/start", "host": ["{{base_url}}"], "path": ["demo","start"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"services\": [\"payment-service\", \"order-service\", \"api-gateway\"],\n  \"normal_duration_seconds\": 45\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "**Run this folder as a Collection Run with 1 iteration to drive the full live demo:**\n\n1. `POST /demo/start` — normal traffic begins\n2. `(wait 45s via runner delay)`\n3. `POST /demo/cascade` — cascade injected\n4. `GET /demo/status` — confirm auto_triggered=true (poll until true)\n5. Open Investigation Portal — topology graph + streaming RCA renders autonomously\n\n**Runner settings:** Set delay between requests to 45000ms (45s) after step 1 to give judges time to see normal traffic before the cascade."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "postman.setNextRequest('Trigger Cascade — POST /demo/cascade');"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "Connectors",
+      "description": "Manage log source connectors. Each connector pulls or receives events from an external ecosystem (AWS CloudWatch, Kafka, Sentry, etc.) and normalises them into NemoTrace's event schema. All connectors feed the same Redis Streams pipeline — the analysis pipeline never knows the source.\n\n**Supported connector types:** `http_push`, `otlp`, `cloudwatch`, `gcp_logging`, `azure_monitor`, `kafka`, `kinesis`, `pubsub`, `datadog_webhook`, `sentry_webhook`, `pagerduty_webhook`, `github_actions`, `elasticsearch_pull`, `file_watch`, `s3_bucket`",
+      "item": [
+        {
+          "name": "List Connectors — GET /api/v1/connectors",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/connectors", "host": ["{{base_url}}"], "path": ["api","v1","connectors"] },
+            "description": "Returns all registered connectors with their current status. Credentials are never returned."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response has connectors array', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('connectors');",
+                  "    pm.expect(body.connectors).to.be.an('array');",
+                  "});",
+                  "if (pm.response.json().connectors.length > 0) {",
+                  "    const c = pm.response.json().connectors[0];",
+                  "    pm.collectionVariables.set('connector_id', c.connector_id);",
+                  "    pm.test('Connector has required fields', function () {",
+                  "        pm.expect(c).to.have.all.keys('connector_id','name','connector_type','service_label','status','enabled','last_connected_at');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"connectors\": [\n    {\n      \"connector_id\": \"c1000000-0000-0000-0000-000000000001\",\n      \"name\": \"prod-payment-cloudwatch\",\n      \"connector_type\": \"cloudwatch\",\n      \"service_label\": \"payment-service\",\n      \"enabled\": true,\n      \"status\": \"connected\",\n      \"last_connected_at\": \"2026-09-19T10:00:00Z\"\n    },\n    {\n      \"connector_id\": \"c1000000-0000-0000-0000-000000000002\",\n      \"name\": \"prod-sentry\",\n      \"connector_type\": \"sentry_webhook\",\n      \"service_label\": \"frontend-svc\",\n      \"enabled\": true,\n      \"status\": \"connected\",\n      \"last_connected_at\": \"2026-09-19T09:58:00Z\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Register CloudWatch Connector — POST /api/v1/connectors",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/v1/connectors", "host": ["{{base_url}}"], "path": ["api","v1","connectors"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"prod-payment-cloudwatch\",\n  \"connector_type\": \"cloudwatch\",\n  \"service_label\": \"payment-service\",\n  \"config\": {\n    \"log_group\": \"/ecs/payment-service\",\n    \"region\": \"us-east-1\",\n    \"aws_access_key_id\": \"AKIAIOSFODNN7EXAMPLE\",\n    \"aws_secret_access_key\": \"wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\",\n    \"poll_interval_seconds\": 15\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Register a new AWS CloudWatch Logs connector. NemoTrace will poll the specified log group every 15 seconds, normalise each log event, and write it to the `payment-service` Redis Stream.\n\nCredentials are encrypted at rest using AES-256 and are never returned by any GET endpoint."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201 Created', function () { pm.response.to.have.status(201); });",
+                  "pm.test('Connector created with disconnected status', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('connector_id');",
+                  "    pm.expect(body.status).to.eql('disconnected');",
+                  "    pm.collectionVariables.set('connector_id', body.connector_id);",
+                  "});",
+                  "pm.test('Config not returned in response', function () {",
+                  "    pm.expect(pm.response.json()).to.not.have.property('config');",
+                  "    pm.expect(pm.response.json()).to.not.have.property('config_encrypted');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"connector_id\": \"c1000000-0000-0000-0000-000000000001\",\n  \"name\": \"prod-payment-cloudwatch\",\n  \"connector_type\": \"cloudwatch\",\n  \"service_label\": \"payment-service\",\n  \"enabled\": true,\n  \"status\": \"disconnected\",\n  \"last_connected_at\": null\n}"
+            },
+            {
+              "name": "400 Unknown Connector Type",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"detail\": \"Unknown connector_type 'splunk'. Registered types: http_push, otlp, cloudwatch, gcp_logging, azure_monitor, kafka, kinesis, pubsub, datadog_webhook, sentry_webhook, pagerduty_webhook, github_actions, elasticsearch_pull, file_watch, s3_bucket\" }"
+            }
+          ]
+        },
+        {
+          "name": "Register Kafka Connector — POST /api/v1/connectors",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/v1/connectors", "host": ["{{base_url}}"], "path": ["api","v1","connectors"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"prod-order-kafka\",\n  \"connector_type\": \"kafka\",\n  \"service_label\": \"order-service\",\n  \"config\": {\n    \"brokers\": [\"kafka-broker-1:9092\", \"kafka-broker-2:9092\"],\n    \"topic\": \"order-service.logs\",\n    \"group_id\": \"nemotrace-consumer\",\n    \"sasl_config\": {\n      \"mechanism\": \"SCRAM-SHA-256\",\n      \"username\": \"nemotrace\",\n      \"password\": \"secret\"\n    }\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Register a Kafka topic consumer. NemoTrace joins the consumer group and streams log events from the topic continuously."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201 Created', function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Register Sentry Webhook Connector — POST /api/v1/connectors",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/v1/connectors", "host": ["{{base_url}}"], "path": ["api","v1","connectors"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"sentry-frontend\",\n  \"connector_type\": \"sentry_webhook\",\n  \"service_label\": \"frontend-svc\",\n  \"config\": {\n    \"webhook_secret\": \"sentry-hmac-secret\",\n    \"project_slug\": \"frontend\"\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Register a Sentry webhook connector. NemoTrace exposes a webhook endpoint at `POST /api/v1/connectors/{connector_id}/webhook` that Sentry posts error events to. Configure this URL in Sentry's webhook settings."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Test Connector — POST /api/v1/connectors/:id/test",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/connectors/{{connector_id}}/test",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","connectors","{{connector_id}}","test"]
+            },
+            "description": "Instantiates the connector, attempts `connect()`, reads one sample event, then disconnects. Use this immediately after registering a connector to verify credentials and connectivity before enabling it in production."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Test result has success flag', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('success');",
+                  "    pm.expect(body).to.have.property('latency_ms');",
+                  "});",
+                  "pm.test('Connection succeeded', function () {",
+                  "    pm.expect(pm.response.json().success).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 Success",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"latency_ms\": 142,\n  \"sample_event\": {\n    \"timestamp\": \"2026-09-19T10:00:00Z\",\n    \"level\": \"INFO\",\n    \"service\": \"payment-service\",\n    \"message\": \"Payment processed successfully for order #8820\"\n  }\n}"
+            },
+            {
+              "name": "200 Failure",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": false,\n  \"latency_ms\": 3001,\n  \"error\": \"botocore.exceptions.NoCredentialsError: Unable to locate credentials\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Enable / Disable Connector — PUT /api/v1/connectors/:id",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/connectors/{{connector_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","connectors","{{connector_id}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"enabled\": false\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Partial update. Set `enabled: false` to pause the connector without deleting its config. The Connector Runner picks up the change within 30 seconds."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('enabled field updated', function () {",
+                  "    const requested = JSON.parse(pm.request.body.raw);",
+                  "    pm.expect(pm.response.json().enabled).to.eql(requested.enabled);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Delete Connector — DELETE /api/v1/connectors/:id",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/connectors/{{connector_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","connectors","{{connector_id}}"]
+            },
+            "description": "Permanently removes the connector and its encrypted config. The Connector Runner stops the connector task within 30 seconds."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204 No Content', function () { pm.response.to.have.status(204); });",
+                  "pm.collectionVariables.set('connector_id', '');"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "204 No Content",
+              "status": "No Content",
+              "code": 204,
+              "header": [],
+              "body": ""
+            }
+          ]
+        }
+      ]
+    }
+
+  ]
+}

@@ -1,0 +1,749 @@
+openapi: "3.1.0"
+
+info:
+  title: NemoTrace API
+  version: "0.1.0"
+  description: >
+    AI-powered log intelligence for microservice environments.
+    Uses NVIDIA Nemotron Nano 8B and Ultra 253B via Nebius Token Factory.
+
+servers:
+  - url: http://localhost:8000
+    description: Local development
+
+security:
+  - ApiKeyAuth: []
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    # ── Ingest ────────────────────────────────────────────────────────────────
+
+    RawEvent:
+      type: object
+      required: [timestamp, level, message]
+      additionalProperties: true
+      properties:
+        timestamp:
+          type: string
+          description: ISO 8601 timestamp
+          example: "2024-01-15T10:30:00.000Z"
+        level:
+          type: string
+          description: "ERROR | WARN | INFO | DEBUG | CRITICAL"
+          example: ERROR
+        message:
+          type: string
+          example: "Connection pool exhausted"
+        trace_id:
+          type: string
+          nullable: true
+          example: "4bf92f3577b34da6a3ce929d0e0e4736"
+        span_id:
+          type: string
+          nullable: true
+          example: "00f067aa0ba902b7"
+        error_type:
+          type: string
+          nullable: true
+          example: "PoolTimeoutError"
+        stack_trace:
+          type: string
+          nullable: true
+        duration_ms:
+          type: integer
+          nullable: true
+          example: 3021
+
+    IngestPayload:
+      type: object
+      required: [service, events]
+      properties:
+        service:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: payment-service
+        events:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/RawEvent"
+
+    IngestResponse:
+      type: object
+      properties:
+        accepted:
+          type: integer
+          example: 50
+        dropped:
+          type: integer
+          example: 0
+
+    # ── Submissions ───────────────────────────────────────────────────────────
+
+    SubmissionStatusResponse:
+      type: object
+      properties:
+        submission_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          example: processing
+        incident_count:
+          type: integer
+          example: 1
+        created_at:
+          type: string
+          format: date-time
+
+    IncidentSummary:
+      type: object
+      properties:
+        incident_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          example: analysed
+        root_cause_service:
+          type: string
+          nullable: true
+          example: payment-service
+        confidence_score:
+          type: number
+          format: float
+          nullable: true
+          example: 0.92
+
+    IncidentListResponse:
+      type: object
+      properties:
+        incidents:
+          type: array
+          items:
+            $ref: "#/components/schemas/IncidentSummary"
+
+    # ── Incidents ─────────────────────────────────────────────────────────────
+
+    FixSuggestionOut:
+      type: object
+      properties:
+        source_title:
+          type: string
+        source_url:
+          type: string
+          format: uri
+        excerpt:
+          type: string
+        tavily_score:
+          type: number
+          format: float
+        query_type:
+          type: string
+
+    IncidentReportResponse:
+      type: object
+      properties:
+        incident_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          example: analysed
+        services_involved:
+          type: array
+          items:
+            type: string
+          example: ["payment-service", "order-service", "api-gateway"]
+        service_topology:
+          type: object
+          nullable: true
+        root_cause_service:
+          type: string
+          nullable: true
+          example: payment-service
+        root_cause_method:
+          type: string
+          nullable: true
+          example: checkout
+        confidence_score:
+          type: number
+          format: float
+          nullable: true
+          example: 0.92
+        cascade_explanation:
+          type: string
+          nullable: true
+        cascade_chain:
+          type: array
+          nullable: true
+          items:
+            type: object
+        alternative_hypotheses:
+          type: array
+          nullable: true
+          items:
+            type: object
+        fix_suggestions:
+          type: array
+          items:
+            $ref: "#/components/schemas/FixSuggestionOut"
+
+    ChatRequest:
+      type: object
+      required: [question]
+      properties:
+        question:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          example: "Why did payment-service fail?"
+
+    # ── Health ────────────────────────────────────────────────────────────────
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+
+    ReadinessResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ready
+        checks:
+          type: object
+          properties:
+            postgres:
+              type: string
+              example: ok
+            redis:
+              type: string
+              example: ok
+
+    # ── Logs ──────────────────────────────────────────────────────────────────
+
+    ServiceEntry:
+      type: object
+      properties:
+        service:
+          type: string
+        event_count:
+          type: integer
+
+    ServicesResponse:
+      type: object
+      properties:
+        services:
+          type: array
+          items:
+            $ref: "#/components/schemas/ServiceEntry"
+
+    LogEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        timestamp:
+          type: string
+        level:
+          type: string
+        message:
+          type: string
+        trace_id:
+          type: string
+          nullable: true
+        span_id:
+          type: string
+          nullable: true
+        error_type:
+          type: string
+          nullable: true
+        stack_trace:
+          type: string
+          nullable: true
+        duration_ms:
+          type: string
+          nullable: true
+
+    ServiceLogsResponse:
+      type: object
+      properties:
+        service:
+          type: string
+        total:
+          type: integer
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/LogEvent"
+
+    # ── Demo ──────────────────────────────────────────────────────────────────
+
+    DemoStartRequest:
+      type: object
+      properties:
+        services:
+          type: array
+          items:
+            type: string
+          default: ["payment-service", "order-service", "api-gateway"]
+        normal_duration_seconds:
+          type: integer
+          default: 60
+          minimum: 10
+          maximum: 300
+
+    DemoStartResponse:
+      type: object
+      properties:
+        demo_session_id:
+          type: string
+        phase:
+          type: string
+          example: normal
+        services:
+          type: array
+          items:
+            type: string
+        message:
+          type: string
+
+    DemoCascadeResponse:
+      type: object
+      properties:
+        phase:
+          type: string
+          example: cascade
+        trace_id:
+          type: string
+        cascade_sequence:
+          type: array
+          items:
+            type: object
+        expected_trigger_in_seconds:
+          type: integer
+          example: 60
+        message:
+          type: string
+
+    DemoStatusResponse:
+      type: object
+      properties:
+        phase:
+          type: string
+          example: normal
+        events_pushed:
+          type: object
+          additionalProperties:
+            type: integer
+        auto_triggered:
+          type: boolean
+        submission_id:
+          type: string
+          format: uuid
+          nullable: true
+        incident_id:
+          type: string
+          format: uuid
+          nullable: true
+        message:
+          type: string
+          nullable: true
+
+    DemoResetRequest:
+      type: object
+      properties:
+        clear_redis_streams:
+          type: boolean
+          default: true
+        clear_db_submissions:
+          type: boolean
+          default: false
+
+    DemoResetResponse:
+      type: object
+      properties:
+        phase:
+          type: string
+          example: idle
+        redis_streams_cleared:
+          type: boolean
+        db_submissions_cleared:
+          type: boolean
+        message:
+          type: string
+
+    # ── Errors ────────────────────────────────────────────────────────────────
+
+    ErrorDetail:
+      type: object
+      properties:
+        detail:
+          type: string
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid API key
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorDetail"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorDetail"
+
+paths:
+  # ── Health ──────────────────────────────────────────────────────────────────
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness probe
+      description: Returns 200 if the process is alive. No auth required.
+      security: []
+      operationId: liveness
+      responses:
+        "200":
+          description: Process is alive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /ready:
+    get:
+      tags: [Health]
+      summary: Readiness probe
+      description: >
+        Checks connectivity to PostgreSQL and Redis.
+        Returns 200 if all dependencies are reachable, 503 if any are down.
+      security: []
+      operationId: readiness
+      responses:
+        "200":
+          description: All dependencies healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessResponse"
+        "503":
+          description: One or more dependencies unreachable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessResponse"
+
+  # ── Ingestion ───────────────────────────────────────────────────────────────
+
+  /api/v1/ingest:
+    post:
+      tags: [Ingestion]
+      summary: Ingest log events
+      description: >
+        Receive a batch of log events from a microservice or log shipper.
+        Hot path — writes only to Redis Streams, no DB write. Target p99 < 50ms.
+        Events are capped at INGEST_MAX_EVENTS_PER_CALL (default 500) per call.
+      operationId: ingestEvents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IngestPayload"
+            example:
+              service: payment-service
+              events:
+                - timestamp: "2024-01-15T10:30:00.000Z"
+                  level: ERROR
+                  message: "Connection pool exhausted"
+                  trace_id: "4bf92f3577b34da6a3ce929d0e0e4736"
+                  error_type: PoolTimeoutError
+                  duration_ms: 3021
+      responses:
+        "200":
+          description: Events accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestResponse"
+        "401":
+          description: Missing or invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+        "422":
+          description: Validation error
+
+  # ── Submissions ──────────────────────────────────────────────────────────────
+
+  /api/v1/submissions/{submission_id}:
+    get:
+      tags: [Submissions]
+      summary: Get submission status
+      operationId: getSubmissionStatus
+      parameters:
+        - name: submission_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Submission status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmissionStatusResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/submissions/{submission_id}/incidents:
+    get:
+      tags: [Submissions]
+      summary: List incidents for a submission
+      operationId: listIncidents
+      parameters:
+        - name: submission_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: List of incidents
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/submissions/{submission_id}/stream:
+    get:
+      tags: [Submissions]
+      summary: Stream analysis progress (SSE)
+      description: >
+        Server-Sent Events stream of analysis progress for a submission.
+        Stage-1 and Stage-2 jobs publish tokens to Redis pub/sub;
+        this endpoint subscribes and forwards them to the client.
+        Stream ends when `{"step": "complete", "progress_pct": 100}` is received.
+      operationId: streamSubmissionProgress
+      parameters:
+        - name: submission_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: SSE stream of progress events
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              example: |
+                data: {"step": "stage1_start", "progress_pct": 10}
+
+                data: {"step": "complete", "progress_pct": 100}
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ── Incidents ────────────────────────────────────────────────────────────────
+
+  /api/v1/incidents/{incident_id}:
+    get:
+      tags: [Incidents]
+      summary: Get incident report
+      description: >
+        Full incident report including root-cause analysis, cascade chain,
+        alternative hypotheses, and Tavily-sourced fix suggestions.
+      operationId: getIncidentReport
+      parameters:
+        - name: incident_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Full incident report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentReportResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ── Logs ─────────────────────────────────────────────────────────────────────
+
+  /api/v1/logs/services:
+    get:
+      tags: [Logs]
+      summary: List services with log data
+      description: Returns services that currently have log events in Redis streams.
+      operationId: listServices
+      responses:
+        "200":
+          description: Services with event counts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServicesResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/logs/{service}:
+    get:
+      tags: [Logs]
+      summary: Get recent logs for a service
+      description: Read recent log events from the Redis stream for a service.
+      operationId: getServiceLogs
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema:
+            type: string
+          example: payment-service
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 200
+            minimum: 1
+            maximum: 1000
+        - name: level
+          in: query
+          description: "Filter by level: ERROR, WARN, INFO, DEBUG"
+          schema:
+            type: string
+            enum: [ERROR, WARN, INFO, DEBUG, CRITICAL]
+      responses:
+        "200":
+          description: Log events for the service
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceLogsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ── Demo ─────────────────────────────────────────────────────────────────────
+
+  /demo/start:
+    post:
+      tags: [Demo]
+      summary: Start demo normal traffic
+      description: >
+        Start normal background traffic from all producer services.
+        Producers subscribe to the Redis pub/sub command channel and begin pushing events.
+      operationId: startDemo
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DemoStartRequest"
+      responses:
+        "200":
+          description: Demo started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DemoStartResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: Demo already running
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+
+  /demo/cascade:
+    post:
+      tags: [Demo]
+      summary: Inject cascade failure
+      description: >
+        Inject the 3-service cascade failure scenario.
+        A shared trace_id is generated so NemoTrace can correlate all three services.
+        Stream Processor will auto-trigger analysis within ~60 seconds.
+      operationId: triggerCascade
+      responses:
+        "200":
+          description: Cascade injected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DemoCascadeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: Cascade already in progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+
+  /demo/status:
+    get:
+      tags: [Demo]
+      summary: Get demo status
+      description: Current demo phase, events pushed per service, and submission ID if triggered.
+      operationId: getDemoStatus
+      responses:
+        "200":
+          description: Current demo state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DemoStatusResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /demo/reset:
+    post:
+      tags: [Demo]
+      summary: Reset demo
+      description: >
+        Stop all producers, reset demo state to idle.
+        Optionally flush Redis ingest streams so the Stream Processor starts clean.
+      operationId: resetDemo
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DemoResetRequest"
+      responses:
+        "200":
+          description: Demo reset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DemoResetResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"

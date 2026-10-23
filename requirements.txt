@@ -1,0 +1,42 @@
+# ── API framework ─────────────────────────────────────────────────────────────
+fastapi==0.115.0           # async web framework + OpenAPI docs
+uvicorn[standard]==0.30.6  # ASGI server with hot-reload and websocket support
+python-multipart==0.0.9    # multipart/form-data file uploads (log file ingest)
+httpx==0.27.2              # async HTTP client (demo producers → ingest endpoint)
+
+# ── Config & validation ───────────────────────────────────────────────────────
+pydantic==2.9.2            # request/response models and data validation
+pydantic-settings==2.5.2   # env-var config loading with type coercion
+
+# ── Database ──────────────────────────────────────────────────────────────────
+sqlalchemy[asyncio]==2.0.35  # ORM + async query engine
+asyncpg==0.29.0              # high-performance async PostgreSQL driver
+alembic==1.13.3              # schema migrations (autogenerate from ORM models)
+
+# ── Queue & cache ─────────────────────────────────────────────────────────────
+redis[hiredis]==5.1.0   # Redis Streams (ingest queue) + pub/sub (demo commands, SSE)
+                         # hiredis C extension for ~5x faster parsing
+
+# ── Object storage ────────────────────────────────────────────────────────────
+boto3==1.35.34           # S3-compatible client for Nebius Object Storage (no AWS account needed)
+                         # Nebius Object Storage speaks the S3 API; boto3 just changes endpoint_url
+
+# ── AI / LLM ─────────────────────────────────────────────────────────────────
+openai==1.50.2           # OpenAI-compatible client for Nebius Token Factory
+                         # drives Nemotron Nano 8B (classification) and Ultra 253B (RCA)
+tavily-python==0.5.0     # Tavily Search API — dual-query fix suggestions (remediation + CVE)
+
+# ── Investigation Portal ──────────────────────────────────────────────────────
+streamlit==1.39.0        # web dashboard for the investigation portal UI
+streamlit-agraph==0.0.45 # force-directed topology graph (service dependency visualisation)
+weasyprint==62.3         # HTML→PDF export of incident reports
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+structlog==24.4.0        # structured JSON logging with bound context
+
+# ── Log parsing ───────────────────────────────────────────────────────────────
+python-dateutil==2.9.0   # flexible timestamp parsing across log formats
+regex==2024.9.11         # full-featured regex for log line extraction
+
+# ── Dev / test (install with: pip install -r requirements-dev.txt) ────────────
+# See requirements-dev.txt

@@ -8,20 +8,20 @@ from db.models import ApiKey
 
 router = APIRouter()
 
-_KNOWN_SERVICES = ["payment-service", "order-service", "api-gateway"]
-
-
 @router.get("/logs/services")
 async def list_services(
     redis: Redis = Depends(get_redis),
     api_key: ApiKey = Depends(require_api_key),
 ) -> dict:
     """Return services that have log data in Redis streams."""
+    prefix = "stream:ingest:"
     services = []
-    for svc in _KNOWN_SERVICES:
+    async for key in redis.scan_iter(f"{prefix}*"):
+        svc = (key.decode() if isinstance(key, bytes) else key).removeprefix(prefix)
         length = await redis.xlen(RedisKeys.ingest_stream(svc))
         if length > 0:
             services.append({"service": svc, "event_count": length})
+    services.sort(key=lambda s: s["service"])
     return {"services": services}
 
 

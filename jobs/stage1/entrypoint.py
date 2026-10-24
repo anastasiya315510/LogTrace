@@ -11,6 +11,8 @@ Optional env var: SOURCE_METHOD (auto_trigger | upload) — defaults to upload
 import asyncio
 import json
 import os
+import subprocess
+import sys
 import uuid
 from datetime import UTC
 
@@ -148,7 +150,7 @@ async def _insert_incident(
 
 
 async def _enqueue_stage2(redis, incident_id: uuid.UUID, submission_id: uuid.UUID) -> None:
-    """Push stage-2 job to the analysis queue."""
+    """Push stage-2 job to the analysis queue and dispatch as subprocess."""
     payload = json.dumps(
         {
             "incident_id": str(incident_id),
@@ -157,6 +159,27 @@ async def _enqueue_stage2(redis, incident_id: uuid.UUID, submission_id: uuid.UUI
     )
     await redis.xadd(RedisKeys.analysis_queue(), {"payload": payload})
     log.info("stage2_enqueued", incident_id=str(incident_id))
+
+    env = {
+        **os.environ,
+        "INCIDENT_ID": str(incident_id),
+        "SUBMISSION_ID": str(submission_id),
+    }
+    log_path = f"/tmp/nemotrace/stage2_{str(incident_id)[:8]}.log"
+    try:
+        # start_new_session=True detaches Stage 2 from Stage 1's process group
+        # so it survives when Stage 1's event loop closes.
+        with open(log_path, "w") as log_fh:
+            proc = subprocess.Popen(
+                [sys.executable, "-m", "jobs.stage2.entrypoint"],
+                env=env,
+                stdout=log_fh,
+                stderr=log_fh,
+                start_new_session=True,
+            )
+        log.info("stage2_dispatched", incident_id=str(incident_id), pid=proc.pid, log=log_path)
+    except Exception:
+        log.exception("stage2_dispatch_failed", incident_id=str(incident_id))
 
 
 async def _update_submission_status(session, submission_id: uuid.UUID, status: str) -> None:

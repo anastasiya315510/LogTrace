@@ -2,23 +2,168 @@
 @tailwind components;
 @tailwind utilities;
 
-/* thin scrollbar for dark theme */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #0f172a;
-}
-::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+/* ── Design tokens ──────────────────────────────────────────────────────── */
+:root {
+  --bg:       #202427;
+  --card:     #292E32;
+  --card-2:   #2F3438;
+  --success:  #8FB5A0;
+  --info:     #7F9DB5;
+  --alt:      #879477;
+  --warning:  #C9A05A;
+  --error:    #C47D6D;
+  --text:     #E3E5E2;
+  --text-2:   rgba(227,229,226,0.55);
+  --text-3:   rgba(227,229,226,0.28);
+  --border:   rgba(227,229,226,0.08);
+  --border-2: rgba(227,229,226,0.04);
 }
 
-* {
-  scrollbar-width: thin;
-  scrollbar-color: #334155 #0f172a;
+/* ── Base ───────────────────────────────────────────────────────────────── */
+html, body, #root {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--bg);
+  color: var(--text);
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar         { width: 5px; height: 5px; }
+::-webkit-scrollbar-track   { background: var(--bg); }
+::-webkit-scrollbar-thumb   { background: #2F3438; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #3A4045; }
+*                           { scrollbar-width: thin; scrollbar-color: #2F3438 var(--bg); }
+
+/* ── Focus ──────────────────────────────────────────────────────────────── */
+:focus-visible { outline: 2px solid rgba(127,157,181,0.5); outline-offset: 2px; }
+
+/* ── RCA markdown prose ─────────────────────────────────────────────────── */
+.rca-prose { line-height: 1.8; color: var(--text); }
+
+.rca-prose h1,
+.rca-prose h2,
+.rca-prose h3 {
+  color: var(--text);
+  font-weight: 700;
+  margin-top: 1.4em;
+  margin-bottom: 0.5em;
+  letter-spacing: -0.01em;
+}
+.rca-prose h1 { font-size: 1.15rem; }
+.rca-prose h2 { font-size: 1.05rem; border-bottom: 1px solid var(--border); padding-bottom: 0.35em; }
+.rca-prose h3 { font-size: 0.95rem; color: var(--text-2); }
+
+.rca-prose p   { margin-bottom: 0.9em; color: rgba(227,229,226,0.82); }
+.rca-prose strong { color: var(--text); font-weight: 600; }
+.rca-prose em  { color: var(--text-2); }
+
+.rca-prose ul, .rca-prose ol { padding-left: 1.5em; margin-bottom: 0.9em; }
+.rca-prose li  { margin-bottom: 0.35em; color: rgba(227,229,226,0.82); }
+
+.rca-prose code {
+  background: rgba(32,36,39,0.9);
+  color: var(--info);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.1em 0.45em;
+  font-size: 0.84em;
+  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+}
+
+.rca-prose pre {
+  background: rgba(22,25,28,0.95);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.1em;
+  overflow-x: auto;
+  margin-bottom: 0.9em;
+}
+.rca-prose pre code { background: none; border: none; padding: 0; font-size: 0.82em; color: var(--text-2); }
+
+.rca-prose table { width: 100%; border-collapse: collapse; margin-bottom: 0.9em; font-size: 0.85rem; }
+.rca-prose th {
+  background: rgba(41,46,50,0.7);
+  color: var(--text-2);
+  font-weight: 600;
+  text-align: left;
+  padding: 0.45em 0.75em;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.rca-prose td { padding: 0.5em 0.75em; border-bottom: 1px solid var(--border-2); color: rgba(227,229,226,0.82); }
+.rca-prose tr:last-child td { border-bottom: none; }
+
+.rca-prose blockquote {
+  border-left: 3px solid var(--info);
+  padding-left: 1em;
+  margin: 0.9em 0;
+  color: var(--text-2);
+  font-style: italic;
+}
+
+.rca-prose a { color: var(--info); text-decoration: underline; text-underline-offset: 3px; }
+.rca-prose hr { border: none; border-top: 1px solid var(--border); margin: 1.4em 0; }
+
+/* ── PDF / Print ────────────────────────────────────────────────────────── */
+@media print {
+  @page {
+    size: A4;
+    margin: 1.4cm 1.6cm;
+  }
+
+  /* Preserve colours exactly */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide all UI chrome */
+  .no-print {
+    display: none !important;
+  }
+
+  /* Expand all scrollable regions so nothing is clipped */
+  .expand-on-print {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* Remove outer page scroll */
+  html, body, #root {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Remove page background chrome */
+  body {
+    background: var(--bg) !important;
+  }
+
+  /* Keep cards readable and avoid mid-card page breaks */
+  .rounded-2xl {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    box-shadow: none !important;
+  }
+
+  /* Give the grid a bit of breathing room across pages */
+  .space-y-5 > * {
+    margin-bottom: 1rem;
+  }
+
+  /* Print-specific NemoTrace watermark */
+  body::after {
+    content: 'NemoTrace — AI Log Intelligence';
+    display: block;
+    position: fixed;
+    bottom: 0.6cm;
+    right: 0.8cm;
+    font-size: 8px;
+    letter-spacing: 0.08em;
+    color: rgba(227,229,226,0.2);
+    font-family: 'Inter', system-ui, sans-serif;
+  }
 }

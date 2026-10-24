@@ -87,6 +87,21 @@ services:
       - .:/app
     command: python -m stream_processor.processor
 
+  streamlit:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    ports:
+      - "8501:8501"
+    environment:
+      DEMO_API_KEY: ${DEMO_API_KEY}
+    depends_on:
+      api:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: streamlit run streamlit_portal/app.py --server.port 8501 --server.headless true --server.address 0.0.0.0
+
   demo-producers:
     build:
       context: .

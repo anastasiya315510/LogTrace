@@ -25,6 +25,8 @@ _ANALYSIS_JSON_RE = re.compile(
     r"<ANALYSIS_JSON>\s*(\{.*?\})\s*</ANALYSIS_JSON>",
     re.DOTALL,
 )
+# Fallback: opening tag present but closing tag missing (truncated response)
+_ANALYSIS_JSON_OPEN_RE = re.compile(r"<ANALYSIS_JSON>\s*(\{.*)", re.DOTALL)
 
 
 def _load_prompt_template() -> str:
@@ -103,8 +105,20 @@ def parse_ultra_response(
     cascade_chain_json = None
     alternative_hypotheses_json = None
 
+    log.info(
+        "ultra_response_parse_start",
+        incident_id=str(incident_id),
+        response_len=len(full_text),
+        has_analysis_json_tag="<ANALYSIS_JSON>" in full_text,
+        regex_matched=bool(match),
+    )
+
     if match:
-        cascade_explanation = full_text[: match.start()].strip()
+        # JSON-first format: explanation is the prose AFTER the closing tag.
+        # Fall back to text before the block for legacy responses.
+        after = full_text[match.end():].strip()
+        before = full_text[: match.start()].strip()
+        cascade_explanation = after if after else before
         try:
             data = json.loads(match.group(1))
             root_cause_service = data.get("root_cause_service")
@@ -112,10 +126,85 @@ def parse_ultra_response(
             raw_score = data.get("confidence_score")
             if raw_score is not None:
                 confidence_score = float(raw_score)
-            cascade_chain_json = data.get("cascade_chain")
+                # Normalize: model sometimes outputs 0-100 instead of 0.0-1.0
+                if confidence_score > 1.0:
+                    confidence_score = confidence_score / 100.0
+            raw_chain = data.get("cascade_chain")
+            # Ensure cascade_chain is a list; model may wrap it in a dict
+            cascade_chain_json = raw_chain if isinstance(raw_chain, list) else None
             alternative_hypotheses_json = data.get("alternative_hypotheses")
+            log.info(
+                "ultra_json_parsed",
+                incident_id=str(incident_id),
+                root_cause_service=root_cause_service,
+                confidence_score=confidence_score,
+                cascade_chain_len=len(cascade_chain_json) if isinstance(cascade_chain_json, list) else cascade_chain_json,
+                has_hypotheses=bool(alternative_hypotheses_json),
+            )
         except Exception as exc:
-            log.warning("ultra_json_parse_failed", error=str(exc))
+            log.warning(
+                "ultra_json_parse_failed",
+                error=str(exc),
+                matched_text_preview=match.group(1)[:200],
+            )
+    else:
+        # Fallback: try truncated block (opening tag present, closing tag missing)
+        open_match = _ANALYSIS_JSON_OPEN_RE.search(full_text)
+        if open_match:
+            # With JSON-first: no text before the opening tag normally;
+            # store full text so the prose narrative is still visible.
+            cascade_explanation = full_text[: open_match.start()].strip() or full_text
+            partial = open_match.group(1)
+            # Try to parse as-is first, then progressively trim trailing garbage
+            parsed_partial = False
+            for attempt in (partial, partial.rstrip() + "}"):
+                try:
+                    data = json.loads(attempt)
+                    root_cause_service = data.get("root_cause_service")
+                    root_cause_method = data.get("root_cause_method")
+                    raw_score = data.get("confidence_score")
+                    if raw_score is not None:
+                        confidence_score = float(raw_score)
+                        if confidence_score > 1.0:
+                            confidence_score = confidence_score / 100.0
+                    raw_chain = data.get("cascade_chain")
+                    cascade_chain_json = raw_chain if isinstance(raw_chain, list) else None
+                    alternative_hypotheses_json = data.get("alternative_hypotheses")
+                    parsed_partial = True
+                    log.info("ultra_json_partial_parsed", incident_id=str(incident_id),
+                             root_cause_service=root_cause_service)
+                    break
+                except Exception:
+                    pass
+            if not parsed_partial:
+                # Last resort: regex-extract individual scalar fields
+                for field, pat in [
+                    ("root_cause_service", r'"root_cause_service"\s*:\s*"([^"]+)"'),
+                    ("root_cause_method",  r'"root_cause_method"\s*:\s*"([^"]+)"'),
+                    ("confidence_score",   r'"confidence_score"\s*:\s*([0-9.]+)'),
+                ]:
+                    m = re.search(pat, partial)
+                    if m:
+                        val = m.group(1)
+                        if field == "confidence_score":
+                            try:
+                                confidence_score = float(val)
+                                if confidence_score > 1.0:
+                                    confidence_score /= 100.0
+                            except ValueError:
+                                pass
+                        elif field == "root_cause_service":
+                            root_cause_service = val
+                        elif field == "root_cause_method":
+                            root_cause_method = val
+                log.warning("ultra_json_truncated_scalar_extract", incident_id=str(incident_id),
+                            root_cause_service=root_cause_service, confidence_score=confidence_score)
+        else:
+            log.warning(
+                "ultra_analysis_json_missing",
+                incident_id=str(incident_id),
+                response_tail=full_text[-500:] if len(full_text) > 500 else full_text,
+            )
 
     return IncidentAnalysis(
         incident_id=incident_id,

@@ -78,19 +78,31 @@ class StreamProcessor:
                     mkstream=True,
                 )
 
+    async def _check_reset_signal(self) -> None:
+        """Clear in-memory state if demo reset was requested."""
+        if await self._redis.getdel(RedisKeys.SP_RESET_SIGNAL):
+            self._windows.clear()
+            self._last_triggered.clear()
+            self._error_type_window.clear()
+            log.info("stream_processor_state_reset")
+
     async def _process_once(self) -> None:
+        await self._check_reset_signal()
+
         streams = await self._discover_streams()
         if not streams:
             await asyncio.sleep(1)
             return
 
-        # Ensure consumer group exists on any new streams
+        # Ensure consumer group exists on any new streams discovered mid-run.
+        # id="0" reads from the beginning so events pushed before the group
+        # was created are not silently skipped.
         for stream in streams:
             with contextlib.suppress(Exception):
                 await self._redis.xgroup_create(
                     stream,
                     RedisKeys.SP_CONSUMER_GROUP,
-                    id="$",
+                    id="0",
                     mkstream=True,
                 )
 
@@ -245,16 +257,18 @@ class StreamProcessor:
 
     async def _dispatch_stage1(self, submission_id: uuid.UUID) -> None:
         env = {**os.environ, "SUBMISSION_ID": str(submission_id), "SOURCE_METHOD": "auto_trigger"}
+        log_path = f"/tmp/nemotrace/stage1_{str(submission_id)[:8]}.log"
         try:
-            proc = await asyncio.create_subprocess_exec(
-                sys.executable,
-                "-m",
-                "jobs.stage1.entrypoint",
-                env=env,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            log.info("stage1_dispatched", submission_id=str(submission_id), pid=proc.pid)
+            with open(log_path, "w") as log_fh:
+                proc = await asyncio.create_subprocess_exec(
+                    sys.executable,
+                    "-m",
+                    "jobs.stage1.entrypoint",
+                    env=env,
+                    stdout=log_fh,
+                    stderr=log_fh,
+                )
+            log.info("stage1_dispatched", submission_id=str(submission_id), pid=proc.pid, log=log_path)
             # Fire-and-forget; the subprocess manages its own lifecycle
         except Exception:
             log.exception("stage1_dispatch_failed", submission_id=str(submission_id))

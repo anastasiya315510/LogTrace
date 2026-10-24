@@ -15,6 +15,7 @@ from api.models.schemas import (
     SubmissionResponse,
     SubmissionStatusResponse,
 )
+from core.config import get_settings
 from core.database import get_db
 from core.redis_client import get_redis
 from core.redis_keys import RedisKeys
@@ -23,6 +24,19 @@ from db.models import ApiKey, Incident, Submission
 
 log = structlog.get_logger()
 router = APIRouter()
+
+
+@router.get("/config")
+async def get_upload_config(
+    api_key: ApiKey = Depends(require_api_key),
+) -> dict:
+    """Return upload limits so the portal can enforce them without hardcoding."""
+    cfg = get_settings()
+    return {
+        "upload_max_files": cfg.upload_max_files,
+        "upload_max_file_mb": cfg.upload_max_file_mb,
+        "upload_max_total_mb": cfg.upload_max_total_mb,
+    }
 
 
 @router.get("/submissions/{submission_id}", response_model=SubmissionStatusResponse)
@@ -107,8 +121,6 @@ async def stream_submission_progress(
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
-_MAX_FILES = 20
-_MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB
 _ALLOWED_MIME_PREFIXES = ("text/", "application/json", "application/x-ndjson")
 
 
@@ -127,16 +139,32 @@ async def create_submission(
     Accepts up to 20 text files (≤100 MB each). Files are streamed to object
     storage without loading into memory. Stage-1 is dispatched asynchronously.
     """
+    cfg = get_settings()
+    max_file_bytes = cfg.upload_max_file_mb * 1024 * 1024
+    max_total_bytes = cfg.upload_max_total_mb * 1024 * 1024
+
     if not files:
         raise HTTPException(status_code=422, detail="At least one file is required")
-    if len(files) > _MAX_FILES:
-        raise HTTPException(status_code=422, detail=f"Maximum {_MAX_FILES} files per upload")
+    if len(files) > cfg.upload_max_files:
+        raise HTTPException(status_code=422, detail=f"Maximum {cfg.upload_max_files} files per upload")
+
+    total_size = sum(f.size for f in files if f.size is not None)
+    if total_size > max_total_bytes:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Total upload size {total_size // (1024*1024)} MB exceeds limit of {cfg.upload_max_total_mb} MB",
+        )
 
     submission_id = uuid.uuid4()
     object_keys: list[str] = []
     file_names: list[str] = []
 
     for f in files:
+        if f.size and f.size > max_file_bytes:
+            raise HTTPException(
+                status_code=422,
+                detail=f"File {f.filename!r} is {f.size // (1024*1024)} MB, limit is {cfg.upload_max_file_mb} MB per file",
+            )
         content_type = f.content_type or "text/plain"
         if not any(content_type.startswith(p) for p in _ALLOWED_MIME_PREFIXES):
             raise HTTPException(

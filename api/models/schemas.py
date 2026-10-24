@@ -116,9 +116,14 @@ class DemoStartResponse(BaseModel):
     message: str
 
 
+class DemoCascadeRequest(BaseModel):
+    scenario: str = Field(default="pool_exhaustion", description="pool_exhaustion | memory_leak | slow_query")
+
+
 class DemoCascadeResponse(BaseModel):
     phase: str
     trace_id: str
+    scenario: str
     cascade_sequence: list[dict]
     expected_trigger_in_seconds: int
     message: str

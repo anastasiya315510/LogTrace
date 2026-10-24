@@ -39,18 +39,11 @@ Perform a thorough root cause analysis. Think step by step:
 
 1. Identify the originating failure: which service, method, and error triggered the cascade?
 2. Trace how the failure propagated across services using the topology and timestamps.
-3. Assign a confidence score (0–100%) based on the quality and completeness of the evidence.
+3. Assign a confidence score (0.0–1.0) based on the quality and completeness of the evidence.
 4. Propose alternative hypotheses if the evidence is ambiguous.
 5. Summarise the cascade sequence as an ordered chain.
 
-Write your analysis as a clear, professional incident report. Include:
-- The root cause with supporting evidence from the logs
-- The cascade sequence explained step by step
-- How the topology graph reflects the failure propagation
-- What the confidence score reflects about the evidence quality
-- At least one alternative hypothesis
-
-After your prose analysis, output the following structured block. It MUST appear at the very end of your response, with no text after it.
+**IMPORTANT — output the structured block FIRST, before any prose.** It MUST be the very first thing in your response.
 
 <ANALYSIS_JSON>
 {
@@ -66,3 +59,10 @@ After your prose analysis, output the following structured block. It MUST appear
   ]
 }
 </ANALYSIS_JSON>
+
+After the structured block, write your full analysis as a clear, professional incident report. Include:
+- The root cause with supporting evidence from the logs
+- The cascade sequence explained step by step
+- How the topology graph reflects the failure propagation
+- What the confidence score reflects about the evidence quality
+- At least one alternative hypothesis

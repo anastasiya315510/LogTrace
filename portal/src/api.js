@@ -1,16 +1,23 @@
-const API_KEY = 'dev-demo-key'
 const BASE_URL = ''
 
-const headers = {
-  'X-API-Key': API_KEY,
-  'Content-Type': 'application/json',
+export function getStoredApiKey() {
+  return localStorage.getItem('nemotrace_api_key') || ''
+}
+
+export function setStoredApiKey(key) {
+  localStorage.setItem('nemotrace_api_key', key)
+}
+
+export function clearStoredApiKey() {
+  localStorage.removeItem('nemotrace_api_key')
 }
 
 async function apiFetch(path, options = {}) {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
     headers: {
-      ...headers,
+      'X-API-Key': getStoredApiKey(),
+      'Content-Type': 'application/json',
       ...(options.headers || {}),
     },
   })
@@ -19,6 +26,10 @@ async function apiFetch(path, options = {}) {
     throw new Error(`HTTP ${res.status}: ${text}`)
   }
   return res.json()
+}
+
+export function getUploadConfig() {
+  return apiFetch('/api/v1/config')
 }
 
 export function getDemoStatus() {
@@ -35,8 +46,11 @@ export function startDemo() {
   })
 }
 
-export function triggerCascade() {
-  return apiFetch('/demo/cascade', { method: 'POST' })
+export function triggerCascade(scenario = 'pool_exhaustion') {
+  return apiFetch('/demo/cascade', {
+    method: 'POST',
+    body: JSON.stringify({ scenario }),
+  })
 }
 
 export function resetDemo() {
@@ -67,8 +81,32 @@ export function getIncident(id) {
  *   { step: "...", progress_pct: N }  — progress update
  *   "__DONE__"                 — stream complete
  */
+/**
+ * Upload log files for analysis.
+ * Files must be an array of File objects.
+ * Returns { submission_id, status }
+ */
+export async function uploadLogs(files, timeWindowSeconds = 30) {
+  const form = new FormData()
+  for (const f of files) {
+    form.append('files', f)
+  }
+  form.append('time_window_seconds', String(timeWindowSeconds))
+
+  const res = await fetch('/api/v1/submissions', {
+    method: 'POST',
+    headers: { 'X-API-Key': getStoredApiKey() },
+    body: form,
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`HTTP ${res.status}: ${text}`)
+  }
+  return res.json()
+}
+
 export function createSSEStream(submissionId, { onToken, onStep, onComplete, onError }) {
-  const url = `${BASE_URL}/api/v1/submissions/${submissionId}/stream?api_key=${API_KEY}`
+  const url = `${BASE_URL}/api/v1/submissions/${submissionId}/stream?api_key=${getStoredApiKey()}`
   const es = new EventSource(url)
 
   es.onmessage = (event) => {

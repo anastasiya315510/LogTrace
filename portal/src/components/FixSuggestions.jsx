@@ -1,58 +1,61 @@
 import { useState } from 'react'
+import { Link2, Maximize2, X, Wrench, ShieldAlert, FileText, ExternalLink } from 'lucide-react'
+import { createPortal } from 'react-dom'
 
-const QUERY_TYPE_BADGE = {
-  remediation: 'bg-green-800 text-green-200',
-  vulnerability: 'bg-red-800 text-red-200',
-  other: 'bg-blue-800 text-blue-200',
+const TYPE_STYLE = {
+  remediation:   { text: 'var(--success)', bg: 'rgba(143,181,160,0.12)', ring: 'rgba(143,181,160,0.25)', icon: <Wrench size={11} strokeWidth={2.5} /> },
+  vulnerability: { text: 'var(--error)',   bg: 'rgba(196,125,109,0.12)', ring: 'rgba(196,125,109,0.25)', icon: <ShieldAlert size={11} strokeWidth={2.5} /> },
+  other:         { text: 'var(--info)',    bg: 'rgba(127,157,181,0.12)', ring: 'rgba(127,157,181,0.25)', icon: <FileText size={11} strokeWidth={2.5} /> },
 }
 
-function QueryTypeBadge({ type }) {
-  const cls = QUERY_TYPE_BADGE[type] ?? QUERY_TYPE_BADGE.other
+function TypeBadge({ type }) {
+  const s = TYPE_STYLE[type] ?? TYPE_STYLE.other
   return (
-    <span className={`px-2 py-0.5 rounded text-xs font-semibold uppercase ${cls}`}>{type}</span>
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider"
+      style={{ color: s.text, background: s.bg, boxShadow: `inset 0 0 0 1px ${s.ring}` }}>
+      {s.icon}{type}
+    </span>
+  )
+}
+
+function RelevanceBar({ score }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="w-12 rounded-full h-1 overflow-hidden" style={{ background: 'var(--card-2)' }}>
+        <div className="h-1 rounded-full" style={{ width: `${score}%`, background: 'var(--info)' }} />
+      </div>
+      <span className="text-xs tabular-nums" style={{ color: 'var(--text-2)' }}>{score}%</span>
+    </div>
   )
 }
 
 function SuggestionCard({ suggestion }) {
-  const [expanded, setExpanded] = useState(false)
+  const [open, setOpen] = useState(false)
   const score = suggestion.tavily_score != null ? Math.round(suggestion.tavily_score * 100) : null
 
   return (
-    <div className="bg-slate-900 border border-slate-700 rounded p-3 mb-2 last:mb-0">
-      <div className="flex items-center justify-between mb-1.5 gap-2">
-        <QueryTypeBadge type={suggestion.query_type ?? 'other'} />
-        {score != null && (
-          <span className="text-xs text-slate-400 ml-auto">{score}%</span>
-        )}
+    <div className="rounded-xl p-4 mb-2.5 last:mb-0"
+      style={{ background: 'var(--card-2)', boxShadow: 'inset 0 0 0 1px var(--border)' }}>
+      <div className="flex items-center justify-between mb-2.5 gap-2">
+        <TypeBadge type={suggestion.query_type ?? 'other'} />
+        {score != null && <RelevanceBar score={score} />}
       </div>
-
-      <a
-        href={suggestion.source_url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-blue-400 hover:text-blue-300 hover:underline text-sm font-medium line-clamp-2 block mb-1.5"
-        title={suggestion.source_title}
-      >
-        {suggestion.source_title ?? suggestion.source_url}
+      <a href={suggestion.source_url} target="_blank" rel="noopener noreferrer"
+        className="flex items-start gap-2 group mb-2" title={suggestion.source_title}>
+        <ExternalLink size={12} strokeWidth={2} className="flex-shrink-0 mt-0.5" style={{ color: 'var(--text-3)' }} />
+        <span className="text-sm font-medium leading-snug line-clamp-2" style={{ color: 'var(--info)' }}>
+          {suggestion.source_title ?? suggestion.source_url}
+        </span>
       </a>
-
       {suggestion.excerpt && (
         <>
-          <p
-            className={`text-slate-400 text-xs cursor-pointer ${
-              expanded ? '' : 'line-clamp-3'
-            }`}
-            onClick={() => setExpanded((e) => !e)}
-            title={expanded ? 'Click to collapse' : 'Click to expand'}
-          >
+          <p className={`text-xs leading-relaxed ${open ? '' : 'line-clamp-3'}`} style={{ color: 'var(--text-2)' }}>
             {suggestion.excerpt}
           </p>
-          {!expanded && suggestion.excerpt.length > 150 && (
-            <button
-              className="text-slate-600 hover:text-slate-400 text-xs mt-0.5"
-              onClick={() => setExpanded(true)}
-            >
-              Show more
+          {!open && suggestion.excerpt.length > 150 && (
+            <button className="text-xs mt-1.5 font-medium" style={{ color: 'var(--text-3)' }}
+              onClick={() => setOpen(true)}>
+              Show more ↓
             </button>
           )}
         </>
@@ -61,24 +64,66 @@ function SuggestionCard({ suggestion }) {
   )
 }
 
-export default function FixSuggestions({ suggestions }) {
-  return (
-    <div className="bg-slate-900 rounded-lg border border-slate-700 p-4 h-full flex flex-col">
-      <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
-        Fix Suggestions
-      </h3>
+function SuggestionsContent({ suggestions }) {
+  if (!suggestions || suggestions.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center text-center py-8 gap-3">
+        <Link2 size={28} strokeWidth={1.5} style={{ color: 'var(--text-3)' }} />
+        <p className="text-sm" style={{ color: 'var(--text-2)' }}>No suggestions yet</p>
+      </div>
+    )
+  }
+  return suggestions.map((s, i) => <SuggestionCard key={i} suggestion={s} />)
+}
 
-      {!suggestions || suggestions.length === 0 ? (
-        <div className="flex-1 flex items-center justify-center text-slate-600 text-sm text-center py-8">
-          No suggestions yet
+export default function FixSuggestions({ suggestions }) {
+  const [fullscreen, setFullscreen] = useState(false)
+
+  return (
+    <>
+      <div className="rounded-2xl flex flex-col"
+        style={{ background: 'var(--card)', boxShadow: 'inset 0 0 0 1px var(--border)' }}>
+
+        <div className="flex items-center justify-between px-5 pt-5 pb-3">
+          <h3 className="text-sm font-semibold uppercase tracking-widest" style={{ color: 'var(--text-2)' }}>
+            Fix Suggestions
+          </h3>
+          <button onClick={() => setFullscreen(true)} style={{ color: 'var(--text-3)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-2)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-3)' }}>
+            <Maximize2 size={14} strokeWidth={2} />
+          </button>
         </div>
-      ) : (
-        <div className="overflow-y-auto flex-1">
-          {suggestions.map((s, i) => (
-            <SuggestionCard key={i} suggestion={s} />
-          ))}
+
+        <div className="expand-on-print px-5 pb-5 overflow-y-auto" style={{ maxHeight: '14rem' }}>
+          <SuggestionsContent suggestions={suggestions} />
         </div>
+      </div>
+
+      {fullscreen && createPortal(
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-6 pt-16 overflow-y-auto"
+          style={{ background: 'rgba(20,23,26,0.85)', backdropFilter: 'blur(6px)' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setFullscreen(false) }}>
+          <div className="w-full max-w-3xl rounded-2xl flex flex-col"
+            style={{ background: 'var(--card)', boxShadow: '0 24px 64px rgba(0,0,0,0.5), inset 0 0 0 1px var(--border)' }}>
+            <div className="flex items-center justify-between px-6 pt-6 pb-4"
+              style={{ borderBottom: '1px solid var(--border)' }}>
+              <h3 className="text-sm font-semibold uppercase tracking-widest" style={{ color: 'var(--text-2)' }}>
+                Fix Suggestions
+              </h3>
+              <button onClick={() => setFullscreen(false)} style={{ color: 'var(--text-3)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-3)' }}>
+                <X size={16} strokeWidth={2} />
+              </button>
+            </div>
+            <div className="px-6 py-5">
+              <SuggestionsContent suggestions={suggestions} />
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   )
 }

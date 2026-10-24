@@ -40,3 +40,7 @@ class RedisKeys:
     # ── Stream Processor consumer group ──────────────────────────────────────
     SP_CONSUMER_GROUP = "nemotrace-sp"
     SP_CONSUMER_NAME = "sp-consumer-1"
+
+    # ── Stream Processor reset signal ─────────────────────────────────────────
+    # Set by demo reset; stream processor clears in-memory windows on next tick.
+    SP_RESET_SIGNAL = "stream_processor:reset"

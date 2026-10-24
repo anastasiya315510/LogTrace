@@ -9,10 +9,17 @@ flowchart TD
     classDef stage2    fill:#3b0764,stroke:#a855f7,color:#d8b4fe,rx:8
     classDef storage   fill:#1f2937,stroke:#6b7280,color:#d1d5db,rx:8
     classDef output    fill:#831843,stroke:#ec4899,color:#fbcfe8,rx:8
+    classDef upload    fill:#1a3a2a,stroke:#22c55e,color:#86efac,rx:8
 
-    subgraph PRODUCERS["🚀  Log Producers"]
+    subgraph PRODUCERS["🚀  Log Producers (Live Demo)"]
         direction LR
         SVC["payment-service\norder-service\napi-gateway\n..."]:::producer
+    end
+
+    subgraph UPLOAD_FLOW["📂  File Upload"]
+        direction LR
+        UAPI["POST /api/v1/submissions\n(multipart/form-data)"]:::upload
+        S3[("Nebius S3\nObject Storage")]:::storage
     end
 
     subgraph HOTPATH["⚡  Hot Path  ·  p99 &lt; 50 ms"]
@@ -49,7 +56,7 @@ flowchart TD
         PORT["🖥️ Investigation Portal\n/portal"]:::output
     end
 
-    SUB[("Submission")]:::storage
+    SUB[("Submission\nsource_method=\nauto_trigger|upload")]:::storage
     INC[("Incident")]:::storage
     ANDB[("Analysis")]:::storage
 
@@ -58,6 +65,11 @@ flowchart TD
     RS        -->|"XREADGROUP"| SP
     SP        --> SD
     SD        -->|"spike!"| SUB
+
+    UAPI      -->|"store files"| S3
+    UAPI      -->|"create submission\nsource_method=upload"| SUB
+    S3        -.->|"Stage-1 reads\nfrom S3"| S1A
+
     SUB       --> STAGE1
     S1C       --> INC
     INC       --> STAGE2
@@ -69,12 +81,24 @@ flowchart TD
 
 ---
 
+## Two Ingestion Flows
+
+| Flow | Trigger | `source_method` | Event source for Stage-1 |
+|---|---|---|---|
+| **Live Demo** | Stream Processor detects spike in Redis Streams | `auto_trigger` | Redis (already in memory) |
+| **File Upload** | User uploads files via portal | `upload` | Nebius S3 (files downloaded per job) |
+
+The two flows are **fully isolated** — separate submissions, separate storage, zero shared state.
+
+---
+
 ## Stage Summary
 
 | Stage | What happens |
 |---|---|
 | **Hot Path** | Events written to Redis Streams, API returns in < 50 ms |
-| **Spike Detection** | XREADGROUP consumer counts errors per service per 60 s window; triggers on ≥ 10 |
+| **Spike Detection** | XREADGROUP consumer counts errors per service per 60 s window; triggers on ≥ 10. In-memory debounce state can be cleared via `stream_processor:reset` Redis key (set by demo reset endpoint). |
+| **File Upload** | Files validated (per-file and total size limits from config), stored in Nebius S3, submission created. |
 | **Stage 1** | Parses raw events → correlates by `trace_id` or time window → infers service topology → creates `Incident` rows |
 | **Stage 2** | Nano 8B batch-classifies all events → Ultra 253B runs multi-turn RCA (tokens stream live via SSE) → Tavily fetches fix suggestions |
-| **Output** | Full report available in the Investigation Portal; tokens delivered in real time while Ultra is thinking |
+| **Output** | Full report in the Investigation Portal (React SPA); tokens delivered in real time; Markdown report download available |

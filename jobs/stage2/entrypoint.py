@@ -21,7 +21,7 @@ from core.config import get_settings
 from core.database import get_session_factory
 from core.redis_client import get_redis_pool
 from core.redis_keys import RedisKeys
-from db.models import Incident, LogEvent
+from db.models import Incident, LogEvent, Submission
 from jobs.stage2.classifier import batch_classify
 from jobs.stage2.fix_suggestions import fetch_fix_suggestions
 from jobs.stage2.rca import stream_rca
@@ -144,6 +144,24 @@ async def main() -> None:
             await session.commit()
 
         log.info("stage2_complete", incident_id=str(incident_id), suggestions=len(suggestions))
+
+        # Update submission status once all its incidents are resolved
+        if submission_id:
+            async with session_factory() as session:
+                result = await session.execute(
+                    select(Incident).where(Incident.submission_id == submission_id)
+                )
+                all_incidents = list(result.scalars().all())
+                all_done = all(i.status in ("complete", "failed") for i in all_incidents)
+                if all_done:
+                    any_failed = any(i.status == "failed" for i in all_incidents)
+                    await session.execute(
+                        update(Submission)
+                        .where(Submission.submission_id == submission_id)
+                        .values(raw_status="failed" if any_failed else "complete")
+                    )
+                    await session.commit()
+                    log.info("submission_completed", submission_id=str(submission_id))
 
         # Publish done sentinel
         await publish_step("complete", 100)

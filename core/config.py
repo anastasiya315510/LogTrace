@@ -46,6 +46,11 @@ class Settings(BaseSettings):
     ingest_max_events_per_call: int = 500
     ingest_stream_maxlen: int = 50_000
 
+    # Upload limits
+    upload_max_files: int = 50
+    upload_max_file_mb: int = 50
+    upload_max_total_mb: int = 200
+
 
 @lru_cache
 def get_settings() -> Settings:

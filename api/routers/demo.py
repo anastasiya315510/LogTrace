@@ -8,6 +8,7 @@ from redis.asyncio import Redis
 
 from api.dependencies import require_api_key
 from api.models.schemas import (
+    DemoCascadeRequest,
     DemoCascadeResponse,
     DemoResetRequest,
     DemoResetResponse,
@@ -71,13 +72,34 @@ async def start_demo(
     )
 
 
+_SCENARIO_SEQUENCES = {
+    "pool_exhaustion": [
+        {"service": "payment-service", "delay_seconds": 0,   "error_type": "PoolTimeoutError"},
+        {"service": "order-service",   "delay_seconds": 1.2, "error_type": "UpstreamTimeoutError"},
+        {"service": "api-gateway",     "delay_seconds": 2.8, "error_type": "ServiceUnavailableError"},
+    ],
+    "memory_leak": [
+        {"service": "payment-service", "delay_seconds": 0,   "error_type": "OutOfMemoryError"},
+        {"service": "order-service",   "delay_seconds": 2.0, "error_type": "HighLatencyError"},
+        {"service": "api-gateway",     "delay_seconds": 4.0, "error_type": "GatewayTimeoutError"},
+    ],
+    "slow_query": [
+        {"service": "payment-service", "delay_seconds": 0,   "error_type": "DeadlockError"},
+        {"service": "order-service",   "delay_seconds": 1.5, "error_type": "LockWaitTimeoutError"},
+        {"service": "api-gateway",     "delay_seconds": 3.5, "error_type": "ServiceDegradedError"},
+    ],
+}
+
+
 @router.post("/cascade", response_model=DemoCascadeResponse)
 async def trigger_cascade(
+    body: DemoCascadeRequest = DemoCascadeRequest(),
     redis: Redis = Depends(get_redis),
     api_key: ApiKey = Depends(require_api_key),
 ) -> DemoCascadeResponse:
     """
-    Inject the 3-service cascade failure scenario.
+    Inject a failure cascade scenario.
+    Scenarios: pool_exhaustion (default) | memory_leak | slow_query
     A shared trace_id is generated so NemoTrace can correlate all three services.
     Stream Processor will auto-trigger within ~60 seconds.
     """
@@ -88,32 +110,25 @@ async def trigger_cascade(
             detail="A cascade is already in progress. Call POST /demo/reset first.",
         )
 
+    scenario = body.scenario if body.scenario in _SCENARIO_SEQUENCES else "pool_exhaustion"
     trace_id = uuid.uuid4().hex
-    await redis.hset(RedisKeys.DEMO_STATE, mapping={"phase": "cascade", "trace_id": trace_id})
+    await redis.hset(
+        RedisKeys.DEMO_STATE,
+        mapping={"phase": "cascade", "trace_id": trace_id, "scenario": scenario},
+    )
     await redis.publish(
         RedisKeys.DEMO_COMMANDS,
-        json.dumps({"command": "cascade", "trace_id": trace_id}),
+        json.dumps({"command": "cascade", "trace_id": trace_id, "scenario": scenario}),
     )
 
-    log.info("demo_cascade_triggered", trace_id=trace_id)
+    log.info("demo_cascade_triggered", trace_id=trace_id, scenario=scenario)
     return DemoCascadeResponse(
         phase="cascade",
         trace_id=trace_id,
-        cascade_sequence=[
-            {"service": "payment-service", "delay_seconds": 0, "error_type": "PoolTimeoutError"},
-            {
-                "service": "order-service",
-                "delay_seconds": 1.2,
-                "error_type": "UpstreamTimeoutError",
-            },
-            {
-                "service": "api-gateway",
-                "delay_seconds": 2.8,
-                "error_type": "ServiceUnavailableError",
-            },
-        ],
+        scenario=scenario,
+        cascade_sequence=_SCENARIO_SEQUENCES[scenario],
         expected_trigger_in_seconds=60,
-        message="Cascade injected. Watch the Investigation Portal — Stream Processor will auto-trigger within 60s.",
+        message=f"Cascade '{scenario}' injected. Stream Processor will auto-trigger within 60s.",
     )
 
 
@@ -160,6 +175,7 @@ async def reset_demo(
     """
     await redis.publish(RedisKeys.DEMO_COMMANDS, json.dumps({"command": "stop"}))
     await redis.delete(RedisKeys.DEMO_STATE)
+    await redis.set(RedisKeys.SP_RESET_SIGNAL, "1", ex=60)  # stream processor clears on next tick
 
     if body.clear_redis_streams:
         async for key in redis.scan_iter("stream:ingest:*"):

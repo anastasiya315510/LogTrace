@@ -1,6 +1,5 @@
 # Environment — NEVER commit
 .env
-.env.example
 
 # Python
 __pycache__/
@@ -32,3 +31,7 @@ Thumbs.db
 
 # Alembic compiled
 *.pyc
+
+# Portal build artifacts
+portal/dist/
+portal/node_modules/

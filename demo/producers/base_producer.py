@@ -39,7 +39,7 @@ class BaseProducer(ABC):
         """Push realistic background traffic for the given duration."""
 
     @abstractmethod
-    async def run_cascade(self, trace_id: str) -> None:
+    async def run_cascade(self, trace_id: str, scenario: str = "pool_exhaustion") -> None:
         """Inject service-specific failure events with the shared trace_id."""
 
     # ── Shared helpers ────────────────────────────────────────────────────────
@@ -88,6 +88,14 @@ class BaseProducer(ABC):
                     status=response.status_code,
                     body=response.text[:200],
                 )
+            else:
+                levels = [e.get("level", "?") for e in events]
+                log.debug(
+                    "ingest_push_ok",
+                    service=self.service_name,
+                    count=len(events),
+                    levels=levels,
+                )
         except httpx.RequestError as exc:
             log.warning(
                 "ingest_push_network_error",
@@ -96,7 +104,8 @@ class BaseProducer(ABC):
             )
 
     async def close(self) -> None:
-        await self._client.aclose()
+        if not self._client.is_closed:
+            await self._client.aclose()
 
     # ── Command listener ──────────────────────────────────────────────────────
 
@@ -105,7 +114,12 @@ class BaseProducer(ABC):
         Subscribe to the demo:commands Redis pub/sub channel.
         Drives the producer lifecycle from the /demo API endpoints.
         """
+        import json
+
         import redis.asyncio as aioredis
+
+        # Fresh httpx client for each session so a previous close doesn't linger.
+        self._client = httpx.AsyncClient(timeout=5.0)
 
         r = aioredis.from_url(redis_url, decode_responses=True)
         pubsub = r.pubsub()
@@ -113,25 +127,34 @@ class BaseProducer(ABC):
 
         log.info("producer_listening", service=self.service_name)
 
+        _tasks: list[asyncio.Task] = []
+
         async for message in pubsub.listen():
             if message["type"] != "message":
                 continue
-
-            import json
 
             cmd = json.loads(message["data"])
             command = cmd.get("command")
 
             if command == "start_normal":
                 duration = cmd.get("duration_seconds", 60)
-                asyncio.create_task(self.run_normal(duration))
+                log.info("producer_cmd_start_normal", service=self.service_name, duration=duration)
+                _tasks.append(asyncio.create_task(self.run_normal(duration)))
 
             elif command == "cascade":
                 trace_id = cmd.get("trace_id", uuid.uuid4().hex)
-                asyncio.create_task(self.run_cascade(trace_id))
+                scenario = cmd.get("scenario", "pool_exhaustion")
+                log.info("producer_cmd_cascade", service=self.service_name, scenario=scenario, trace_id=trace_id)
+                _tasks.append(asyncio.create_task(self.run_cascade(trace_id, scenario)))
 
             elif command == "stop":
                 log.info("producer_stopping", service=self.service_name)
+                # Cancel any still-running normal/cascade tasks so they don't
+                # try to push events after the httpx client is closed.
+                for t in _tasks:
+                    t.cancel()
+                if _tasks:
+                    await asyncio.gather(*_tasks, return_exceptions=True)
                 break
 
         await pubsub.unsubscribe("demo:commands")

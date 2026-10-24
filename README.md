@@ -76,11 +76,40 @@ Enter `dev-demo-key` as the API key. The portal auto-discovers incidents after t
 
 ### 4. Trigger a demo cascade
 
-From the portal's **Demo** tab, click **Start Demo** then **Trigger Cascade**. Within ~60 seconds:
-1. The stream processor detects the spike
-2. Stage-1 creates an incident with service topology
+From the portal header, click **▶ Start Demo** then **⚡ Inject Cascade**. Within ~60 seconds:
+1. The stream processor detects the spike and resets its debounce state automatically
+2. Stage-1 parses events, correlates by `trace_id`, infers service topology
 3. Stage-2 runs Nano classification + Ultra RCA (tokens stream live to the portal)
-4. The analysis tab shows root cause, confidence score, cascade chain, and fix suggestions
+4. The investigation view shows root cause, confidence score, cascade chain, and fix suggestions
+5. Click **↓ Download Report** to export a Markdown report of the incident
+
+The portal auto-navigates to the new incident. Click **↺ Reset** to clear everything and run again.
+
+### 5. Upload your own logs
+
+Switch to the **📂 Upload Logs** tab in the portal. Drag-and-drop files or select a folder. Analysis runs completely independently from the live demo — no state is shared.
+
+Upload limits (configurable via `.env`):
+- Up to `UPLOAD_MAX_FILES` files (default: 50)
+- `UPLOAD_MAX_FILE_MB` per file (default: 50 MB)
+- `UPLOAD_MAX_TOTAL_MB` total per submission (default: 200 MB)
+
+---
+
+## Local Development
+
+Use `scripts/dev.sh` to manage all local processes:
+
+```bash
+bash scripts/dev.sh start    # start API, stream processor, producers, portal
+bash scripts/dev.sh stop     # stop all
+bash scripts/dev.sh restart  # restart all
+bash scripts/dev.sh status   # show running PIDs
+bash scripts/dev.sh logs     # tail all logs with color coding
+bash scripts/dev.sh logs api # tail a single service log
+```
+
+Logs are written to `/tmp/nemotrace/*.log`. PIDs are stored in `/tmp/nemotrace/*.pid`.
 
 ---
 
@@ -92,12 +121,13 @@ Key endpoints:
 
 | Endpoint | Description |
 |---|---|
-| `POST /api/v1/ingest` | Ingest log events (hot path) |
+| `POST /api/v1/ingest` | Ingest log events (hot path, < 50 ms p99) |
 | `POST /api/v1/submissions` | Upload log files for analysis |
-| `GET /api/v1/submissions/{id}/stream` | SSE stream of analysis progress |
+| `GET /api/v1/submissions/{id}` | Submission status and incident count |
+| `GET /api/v1/submissions/{id}/incidents` | List incidents for a submission |
+| `GET /api/v1/submissions/{id}/stream` | SSE stream of live analysis progress |
 | `GET /api/v1/incidents/{id}` | Full incident report |
-| `POST /api/v1/incidents/{id}/chat` | Q&A with Ultra 253B about an incident |
-| `GET /api/v1/incidents/{id}/export` | Download Markdown report |
+| `GET /api/v1/config` | Upload limits (read from server config) |
 
 All endpoints require `X-API-Key` header.
 

@@ -33,18 +33,19 @@ def _build_producers() -> list:
 
 
 async def main() -> None:
-    producers = _build_producers()
     log.info(
         "demo_producers_starting",
-        services=[p.service_name for p in producers],
+        services=["payment-service", "order-service", "api-gateway"],
         ingest_url=_INGEST_URL,
         redis_url=_REDIS_URL,
     )
 
-    # Each producer listens independently; all run concurrently until "stop" command.
-    await asyncio.gather(*(p.listen_for_commands(_REDIS_URL) for p in producers))
-
-    log.info("demo_producers_stopped")
+    # Loop forever: after a stop command, rebuild producers and wait for next start.
+    while True:
+        producers = _build_producers()
+        await asyncio.gather(*(p.listen_for_commands(_REDIS_URL) for p in producers))
+        log.info("demo_producers_stopped — waiting for next start command")
+        await asyncio.sleep(1)
 
 
 if __name__ == "__main__":

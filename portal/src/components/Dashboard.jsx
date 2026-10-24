@@ -63,11 +63,12 @@ export default function Dashboard({ demoStatus, onSelectIncident }) {
 
     fetchData()
     const interval = setInterval(async () => {
+      if (['complete', 'failed'].includes(submission?.status)) return
       try {
         const [sub, inc] = await Promise.all([getSubmission(submissionId), getSubmissionIncidents(submissionId)])
         if (!cancelled) { setSubmission(sub); setIncidents(inc?.incidents ?? []) }
       } catch {}
-    }, 3000)
+    }, 5000)
     return () => { cancelled = true; clearInterval(interval) }
   }, [submissionId])
 

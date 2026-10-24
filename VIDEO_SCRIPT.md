@@ -1,96 +1,99 @@
-# NemoTrace — YouTube Demo Video Script
-**Target length: ~2:45 — leave breathing room before 3:00**
+# NemoTrace — Demo Video Script
+**Target length: ~2:45 — stay under 3:00**
 
 ---
 
-## THE STORY
+## SCENE 1 — The Problem (0:00 – 0:20)
 
-### The Problem (0:00 – 0:20)
+> *Screen: red error logs scrolling fast in a terminal.*
 
-> *Screen: a wall of red error logs scrolling fast. Terminal chaos.*
+**Say:**
+"It's 2am. Your payment service is down. Orders are failing.
+You have hundreds of error lines across five services — and somewhere in there is the one thing that started it all.
 
-**Narration:**
-"It's 2am. Your payment service is down. Orders are failing. You have hundreds of thousands of error lines across five microservices — and somewhere in there is the one thing that started it all.
-
-This is what a cascade failure looks like. And right now, finding the root cause takes your team hours."
-
----
-
-### The Solution — Live Demo Starts (0:20 – 0:50)
-
-> *Screen: NemoTrace portal opens. Header shows "● Connected". Demo cascade button.*
-
-**Narration:**
-"NemoTrace watches your services in real time. The moment an error spike is detected — automatically, no human needed — it triggers an AI investigation.
-
-Watch. I'll start the demo cascade now."
-
-> *Click Start Demo. Log events start flowing in the Logs tab — payment-service, order-service, api-gateway all lighting up red.*
-
-"Three services. Hundreds of errors. NemoTrace ingested them all in under a second — straight into Redis Streams for processing."
+Finding it takes your team hours. NemoTrace fixes that."
 
 ---
 
-### AI Pipeline — Classification (0:50 – 1:30)
+## SCENE 2 — Start Demo + Architecture (0:20 – 1:20)
 
-> *Screen: Analysis tab. Progress bar starts moving. Topology graph appears — nodes connecting.*
+> *Screen: NemoTrace portal, Live Demo tab.*
 
-**Narration:**
-"Stage one: the system builds a service topology graph from trace IDs and timestamps. It figures out which service called which, and in what order.
+**Say:**
+"Let me start the demo now — I'll trigger a cascade failure across three services."
 
-Stage two: every single error event gets classified by **Nemotron Nano 8B** — running on **Nebius Token Factory**. That's twenty concurrent AI calls, batched, finishing in seconds.
+> *Click Start Demo. Then immediately switch to the architecture diagram.*
 
-You can see the progress bar filling. Each step — parsing, correlating, classifying — streamed live to the portal via Server-Sent Events."
+"While the producers spin up, let me show you what's happening under the hood."
 
-> *Progress bar hits 100%. Incident card appears.*
+> *Screen: architecture diagram. Point at each part as you say it.*
 
----
+"Your services send logs to NemoTrace — ingested in under 50 milliseconds straight into **Redis Streams** on a **Nebius VM**.
 
-### Root Cause — Ultra 253B Reasoning (1:30 – 2:00)
+A stream processor watches continuously. The moment it sees an error spike — ten errors in sixty seconds — it fires automatically. No one has to click anything.
 
-> *Screen: Incident report card. Confidence score visible. RCA text streaming word by word.*
+Then the AI pipeline runs.
+**Nemotron Nano 8B on Nebius Token Factory** batch-classifies every event.
+**Nemotron Ultra 253B on Nebius Token Factory** reads the full incident and writes the root cause.
+**Tavily** pulls live fix suggestions from the web.
+Raw logs are archived in **Nebius Object Storage**."
 
-**Narration:**
-"And here's where it gets powerful. **Nemotron Ultra 253B** — a 253-billion parameter reasoning model, also on **Nebius Token Factory** — reads the full incident context and writes the root cause explanation. Word by word, streamed in real time.
+> *Switch back to portal — logs are now flooding in, all three services red.*
 
-Confidence: 94%. Root cause: a database connection pool exhaustion in the payment service triggered a cascade through order-service to the API gateway.
-
-Remediation steps — fetched live from the web by **Tavily Search** — appear right below."
-
----
-
-### Interactive Q&A (2:00 – 2:20)
-
-> *Screen: Q&A input. Type a question.*
-
-**Narration:**
-"Every incident is also a conversation. Ask anything — the Ultra model has the full context.
-
-'Was this a gradual degradation or a sudden failure?'"
-
-> *Response streams in.*
-
-"Instant answer. No copy-pasting logs. No context switching."
+"And here it is — the cascade is live."
 
 ---
 
-### Tech Stack Callout (2:20 – 2:45)
+## SCENE 3 — Watching It Run (1:20 – 1:50)
 
-> *Screen: Split — architecture diagram on one side, portal on the other.*
+> *Screen: portal, logs tab flooding with red events.*
 
-**Narration:**
-"NemoTrace is built entirely on open infrastructure.
+**Say:**
+"payment-service, order-service, api-gateway — all failing at the same time.
+The spike detector already fired. Stage 1 is running — grouping events by trace ID, building the service dependency map, storing the incident in **PostgreSQL**.
 
-**Nemotron Nano 8B** on **Nebius Token Factory** handles batch classification — up to 200 events per second. **Nemotron Ultra 253B** on **Token Factory** streams the reasoning. **Nebius Object Storage** keeps the raw log archive. **Tavily** pulls real-time remediation and CVE data.
+Watch the progress bar — every step streams live over **Server-Sent Events**."
 
-The whole stack — FastAPI, Redis, Postgres, nginx — runs in Docker on a Nebius VM. One command to deploy.
-
-This is what open AI infrastructure looks like when it's actually useful."
+> *Progress bar reaches 100%. Incident card appears.*
 
 ---
 
-## KEY PHRASES TO SAY OUT LOUD
-*(Hackathon rules require these to be named in audio)*
+## SCENE 4 — Root Cause Analysis (1:30 – 2:10)
+
+> *Screen: Incident report. RCA text streaming word by word. Confidence score visible.*
+
+> 🔧 **Tech in play:** Nemotron Nano 8B · Nemotron Ultra 253B · Nebius Token Factory · Tavily · SSE
+
+**Say:**
+"Stage 2 starts with **Nemotron Nano 8B on Nebius Token Factory** — it batch-classifies every single error event. Fast, parallel, done in seconds.
+
+Then **Nemotron Ultra 253B on Nebius Token Factory** takes over — 253 billion parameters reasoning through the full incident. You can see it writing word by word, streamed live.
+
+Root cause: the database connection pool in the payment service ran out. That crashed the order service. That crashed the API gateway. A full cascade.
+
+Below the analysis — fix suggestions pulled live from the web by **Tavily**.
+
+From first error to full report: under two minutes."
+
+---
+
+## SCENE 5 — Closing (2:10 – 2:45)
+
+> *Screen: stay on the completed incident report.*
+
+> 🔧 **Tech in play:** Nebius VM · Docker · all of the above
+
+**Say:**
+"This is not a chatbot. It's a full automated pipeline — log ingestion, spike detection, service topology, AI classification, multi-turn reasoning — no human in the loop.
+
+The whole stack — FastAPI, Redis, Postgres, Nginx — runs in Docker on a **Nebius VM**. One command to start.
+
+NemoTrace brings mean time to resolution from hours to minutes."
+
+---
+
+## KEY PHRASES — say these out loud
+*(required by hackathon rules)*
 
 - "Nemotron Nano 8B on Nebius Token Factory"
 - "Nemotron Ultra 253B on Nebius Token Factory"
@@ -99,24 +102,14 @@ This is what open AI infrastructure looks like when it's actually useful."
 
 ---
 
-## RECORDING CHECKLIST
+## BEFORE YOU RECORD — checklist
 
-- [ ] Terminal or browser visible — not a slideshow
-- [ ] Demo cascade actually runs live (not pre-recorded)
-- [ ] SSE progress bar animates in real time (proves it works)
-- [ ] RCA text streams word-by-word (shows Ultra reasoning)
-- [ ] Confidence score > 0 visible on screen
-- [ ] Q&A turn answered on screen
+- [ ] Architecture diagram is open and readable on screen
+- [ ] Demo cascade runs live (not pre-recorded)
+- [ ] Progress bar animates in real time
+- [ ] RCA text streams word by word
+- [ ] Confidence score is visible and > 0
 - [ ] All four key phrases spoken out loud
+- [ ] Audio is clean, no background noise
 - [ ] Video is public on YouTube before submitting
-- [ ] Length ≤ 3:00
-
----
-
-## WHAT MAKES THIS WORTH WATCHING
-
-**Who needs this:** Any engineering team running microservices — every company with more than two backend services has this problem. MTTR (mean time to resolution) for cascade failures is measured in hours. NemoTrace brings it to minutes.
-
-**Why it's impressive:** It's not a chatbot wrapper. It's a full pipeline — stream ingestion, spike detection, topology inference, batched AI classification, multi-turn reasoning — all automated, all streaming, all open source.
-
-**Why Nebius/NVIDIA:** The two-model strategy (Nano for speed, Ultra for depth) is the right engineering call. Token Factory makes it possible without managing a single GPU.
+- [ ] Total length ≤ 3:00

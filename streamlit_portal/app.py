@@ -589,13 +589,8 @@ def render_incident(incident_id: str) -> None:
 
     st.divider()
 
-    # ── RCA stream / polling ──
+    # ── RCA / sections ──
     rca_text = incident.get("cascade_explanation") or ""
-
-    if is_live:
-        st.info("⏳ Analysis in progress — refreshing every 3 seconds…")
-        time.sleep(3)
-        st.rerun()
 
     st.markdown('<div class="section-title">Root Cause Analysis</div>', unsafe_allow_html=True)
 
@@ -623,7 +618,7 @@ def render_incident(incident_id: str) -> None:
                 svc = step.get("service") or step.get("name") or "?"
                 err = step.get("error", "")
                 ts  = step.get("timestamp", "")
-                color = STEP_COLORS_PDF[i % len(STEP_COLORS_PDF)]
+                color = _STEP_COLORS_PDF[i % len(_STEP_COLORS_PDF)]
                 st.markdown(
                     f'<div class="cascade-step">'
                     f'<div class="cascade-num" style="background:{color};color:#202427;'
@@ -722,6 +717,21 @@ def render_incident(incident_id: str) -> None:
                 mime="text/markdown",
                 use_container_width=True,
             )
+
+    # ── Auto-refresh (must be last) ──
+    # Keep a per-incident refresh window: always refresh for 60 s after first open,
+    # then stop. This covers both in-flight polling and post-complete trailing data.
+    _expiry_key = f"_refresh_until_{incident_id}"
+    if _expiry_key not in st.session_state:
+        st.session_state[_expiry_key] = time.time() + 60
+
+    if is_live:
+        st.info("⏳ Analysis in progress — refreshing every 3 seconds…")
+        time.sleep(3)
+        st.rerun()
+    elif time.time() < st.session_state[_expiry_key]:
+        time.sleep(3)
+        st.rerun()
 
 # ── Submission view ───────────────────────────────────────────────────────────
 

@@ -25,6 +25,9 @@ htmlcov/
 .claude/settings.local.json
 .claude/projects/
 
+# Local VM/infra scripts (may contain IDs or keys)
+scripts/create_vm.sh
+
 # OS
 .DS_Store
 Thumbs.db

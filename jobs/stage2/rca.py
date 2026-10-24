@@ -89,6 +89,38 @@ def build_ultra_prompt(
     )
 
 
+def _extract_bare_json(text: str) -> str | None:
+    """
+    Find the outermost balanced JSON object in *text*.
+    Returns the raw JSON string, or None if not found.
+    """
+    start = text.find("{")
+    if start == -1:
+        return None
+    depth = 0
+    in_string = False
+    escape = False
+    for i, ch in enumerate(text[start:], start):
+        if escape:
+            escape = False
+            continue
+        if ch == "\\" and in_string:
+            escape = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    return None
+
+
 def parse_ultra_response(
     full_text: str, incident_id: uuid.UUID, model_used: str
 ) -> IncidentAnalysis:
@@ -200,11 +232,38 @@ def parse_ultra_response(
                 log.warning("ultra_json_truncated_scalar_extract", incident_id=str(incident_id),
                             root_cause_service=root_cause_service, confidence_score=confidence_score)
         else:
-            log.warning(
-                "ultra_analysis_json_missing",
-                incident_id=str(incident_id),
-                response_tail=full_text[-500:] if len(full_text) > 500 else full_text,
-            )
+            # Last resort: model didn't use tags at all — extract the outermost JSON
+            # object from the response (model outputs the data, just without the wrapper)
+            bare_json_candidate = _extract_bare_json(full_text)
+            if bare_json_candidate and "root_cause_service" in bare_json_candidate:
+                try:
+                    data = json.loads(bare_json_candidate)
+                    root_cause_service = data.get("root_cause_service")
+                    root_cause_method = data.get("root_cause_method")
+                    raw_score = data.get("confidence_score")
+                    if raw_score is not None:
+                        confidence_score = float(raw_score)
+                        if confidence_score > 1.0:
+                            confidence_score /= 100.0
+                    raw_chain = data.get("cascade_chain")
+                    cascade_chain_json = raw_chain if isinstance(raw_chain, list) else None
+                    alternative_hypotheses_json = data.get("alternative_hypotheses")
+                    log.info(
+                        "ultra_json_bare_parsed",
+                        incident_id=str(incident_id),
+                        root_cause_service=root_cause_service,
+                        cascade_chain_len=len(cascade_chain_json) if isinstance(cascade_chain_json, list) else None,
+                    )
+                except Exception as exc:
+                    log.warning("ultra_json_bare_parse_failed", incident_id=str(incident_id), error=str(exc))
+                    log.warning("ultra_analysis_json_missing", incident_id=str(incident_id),
+                                response_tail=full_text[-500:] if len(full_text) > 500 else full_text)
+            else:
+                log.warning(
+                    "ultra_analysis_json_missing",
+                    incident_id=str(incident_id),
+                    response_tail=full_text[-500:] if len(full_text) > 500 else full_text,
+                )
 
     return IncidentAnalysis(
         incident_id=incident_id,
@@ -236,7 +295,20 @@ async def stream_rca(
     try:
         stream = await client.chat.completions.create(
             model=model_id,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an expert SRE performing root cause analysis. "
+                        "Your response MUST begin with a <ANALYSIS_JSON> block containing "
+                        "a single JSON object with keys: root_cause_service, root_cause_method, "
+                        "confidence_score (0.0-1.0), cascade_chain (array), alternative_hypotheses (array). "
+                        "Example: <ANALYSIS_JSON>{\"root_cause_service\": \"...\", ...}</ANALYSIS_JSON>\n"
+                        "Output the JSON block FIRST, before any prose explanation."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
             stream=True,
             temperature=0.3,
         )

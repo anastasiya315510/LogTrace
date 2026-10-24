@@ -40,6 +40,7 @@ export default function IncidentView({ incidentId, submissionId, onBack }) {
   const [step, setStep] = useState(null)
   const [progressPct, setProgressPct] = useState(0)
   const esRef = useRef(null)
+  const pollRef = useRef(null)
   const streamStarted = useRef(false)
 
   useEffect(() => {
@@ -74,6 +75,10 @@ export default function IncidentView({ incidentId, submissionId, onBack }) {
         esRef.current.close()
         esRef.current = null
       }
+      if (pollRef.current) {
+        clearInterval(pollRef.current)
+        pollRef.current = null
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [incidentId])
@@ -100,12 +105,49 @@ export default function IncidentView({ incidentId, submissionId, onBack }) {
       onComplete: () => {
         setIsStreaming(false)
         setProgressPct(100)
-        getIncident(incidentId)
-          .then((data) => setIncident(data))
-          .catch(() => {})
+        // Poll every 3 s until cascade_chain and fix_suggestions are both populated.
+        // fix_suggestions arrive from Tavily after the stream ends, so one fetch is never enough.
+        pollRef.current = setInterval(async () => {
+          try {
+            const data = await getIncident(incidentId)
+            setIncident(data)
+            if (data.cascade_chain?.length > 0 && data.fix_suggestions?.length > 0) {
+              clearInterval(pollRef.current)
+              pollRef.current = null
+            }
+          } catch {}
+        }, 3000)
+        // Hard cap: stop after 60 s regardless (Tavily may return zero results)
+        setTimeout(() => {
+          if (pollRef.current) {
+            clearInterval(pollRef.current)
+            pollRef.current = null
+          }
+        }, 60_000)
       },
       onError: () => {
         setIsStreaming(false)
+        // Fallback: if the stream closed before __DONE__ was received (e.g. job
+        // already finished before we connected), start polling so cascade_chain
+        // and fix_suggestions still appear without a manual browser reload.
+        if (!pollRef.current) {
+          pollRef.current = setInterval(async () => {
+            try {
+              const data = await getIncident(incidentId)
+              setIncident(data)
+              if (data.cascade_chain?.length > 0 && data.fix_suggestions?.length > 0) {
+                clearInterval(pollRef.current)
+                pollRef.current = null
+              }
+            } catch {}
+          }, 3000)
+          setTimeout(() => {
+            if (pollRef.current) {
+              clearInterval(pollRef.current)
+              pollRef.current = null
+            }
+          }, 60_000)
+        }
       },
     })
     esRef.current = es

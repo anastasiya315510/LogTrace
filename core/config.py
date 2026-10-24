@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     demo_api_key: str
 
     # Stream Processor tuning
-    error_spike_threshold: int = 10
+    error_spike_threshold: int = 5
     error_spike_window_seconds: int = 60
     stream_discovery_interval_seconds: int = 30
     trigger_debounce_seconds: int = 120

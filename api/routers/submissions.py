@@ -92,6 +92,7 @@ async def list_incidents(
 async def stream_submission_progress(
     submission_id: str,
     redis: Redis = Depends(get_redis),
+    db: AsyncSession = Depends(get_db),
     api_key: ApiKey = Depends(require_api_key_sse),
 ) -> StreamingResponse:
     """
@@ -102,7 +103,22 @@ async def stream_submission_progress(
     """
     channel = RedisKeys.sse_channel(submission_id)
 
+    # Check if the submission already finished before the client connected.
+    # Redis pub/sub does not buffer — if __DONE__ was published before this
+    # subscriber arrived, it is lost.  Detect that here and short-circuit.
+    result = await db.execute(
+        select(Submission.raw_status).where(
+            Submission.submission_id == uuid.UUID(submission_id)
+        )
+    )
+    existing_status = result.scalar_one_or_none()
+
     async def event_generator():
+        if existing_status in ("complete", "failed"):
+            yield 'data: {"step": "complete", "progress_pct": 100}\n\n'
+            yield "data: __DONE__\n\n"
+            return
+
         pubsub = redis.pubsub()
         await pubsub.subscribe(channel)
         try:
@@ -112,6 +128,7 @@ async def stream_submission_progress(
                 data = message["data"]
                 if data == "__DONE__":
                     yield 'data: {"step": "complete", "progress_pct": 100}\n\n'
+                    yield "data: __DONE__\n\n"
                     break
                 yield f"data: {data}\n\n"
         finally:

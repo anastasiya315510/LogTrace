@@ -35,9 +35,8 @@ start_all() {
   echo $! > "$LOG_DIR/producers.pid"
 
   echo "── Starting Portal (Vite) ───────────────────────────"
-  cd portal && nohup npm run dev -- --port 5173 > "$LOG_DIR/portal.log" 2>&1 &
+  (cd portal && nohup npm run dev -- --port 5173 > "$LOG_DIR/portal.log" 2>&1) &
   echo $! > "$LOG_DIR/portal.pid"
-  cd ..
 
   echo "── Starting Streamlit Portal ────────────────────────"
   nohup streamlit run streamlit_portal/app.py \
@@ -58,14 +57,27 @@ start_all() {
 
 stop_all() {
   echo "── Stopping services ────────────────────────────────"
+
+  # Kill by PID file first
   for name in api stream_processor producers portal streamlit; do
     pid_file="$LOG_DIR/$name.pid"
     if [ -f "$pid_file" ]; then
       pid=$(cat "$pid_file")
-      kill "$pid" 2>/dev/null && echo "  stopped $name (pid $pid)" || echo "  $name already stopped"
+      kill "$pid" 2>/dev/null && echo "  stopped $name (pid $pid)" || true
       rm -f "$pid_file"
     fi
   done
+
+  # Kill ALL orphaned process instances by pattern (handles zombie processes
+  # from previous dev sessions that weren't tracked by PID files)
+  pkill -f "uvicorn api.main:app" 2>/dev/null && echo "  killed all uvicorn instances" || true
+  pkill -f "stream_processor.processor" 2>/dev/null && echo "  killed all stream_processor instances" || true
+  pkill -f "demo.producers.run_demo" 2>/dev/null && echo "  killed all producer instances" || true
+  pkill -f "streamlit run streamlit_portal" 2>/dev/null && echo "  killed all streamlit instances" || true
+  # Portal (vite) — match the specific port to avoid killing unrelated vite servers
+  pkill -f "vite.*--port 5173" 2>/dev/null && echo "  killed portal (vite)" || true
+
+  sleep 1
   echo "✓ Done (postgres + redis still running)"
 }
 
@@ -121,11 +133,41 @@ show_logs() {
   wait
 }
 
+clean_start() {
+  echo "── Nuclear clean-start ──────────────────────────────"
+  stop_all
+
+  echo "── Clearing stale logs ──────────────────────────────"
+  rm -f "$LOG_DIR"/stage1_*.log "$LOG_DIR"/stage2_*.log
+  rm -f "$LOG_DIR"/*.pid
+
+  echo "── Resetting Redis demo state ───────────────────────"
+  source "$VENV"
+  python3 - <<'EOF'
+import redis, os
+r = redis.Redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379/0"))
+# Clear demo state and stream processor state
+for key in r.scan_iter("demo:*"):
+    r.delete(key)
+for key in r.scan_iter("stream:ingest:*"):
+    r.delete(key)
+for key in r.scan_iter("stream_processor:*"):
+    r.delete(key)
+for key in r.scan_iter("sse:*"):
+    r.delete(key)
+print("  Redis demo state cleared")
+EOF
+
+  sleep 1
+  start_all
+}
+
 case "${1:-start}" in
-  start)   source "$VENV" && start_all ;;
-  stop)    stop_all ;;
-  restart) stop_all && sleep 1 && source "$VENV" && start_all ;;
-  status)  status_all ;;
-  logs)    show_logs "$@" ;;
-  *) echo "Usage: $0 start|stop|restart|status|logs [service]" && exit 1 ;;
+  start)        source "$VENV" && start_all ;;
+  stop)         stop_all ;;
+  restart)      stop_all && sleep 1 && source "$VENV" && start_all ;;
+  clean-start)  source "$VENV" && clean_start ;;
+  status)       status_all ;;
+  logs)         show_logs "$@" ;;
+  *) echo "Usage: $0 start|stop|restart|clean-start|status|logs [service]" && exit 1 ;;
 esac

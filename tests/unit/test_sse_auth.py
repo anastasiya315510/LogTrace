@@ -169,11 +169,15 @@ async def test_both_header_wins(client_valid: AsyncClient):
 
 async def test_no_auth_returns_401(client_valid: AsyncClient):
     """No header and no query param → 401."""
-    response = await client_valid.get("/api/v1/submissions/00000000-0000-0000-0000-000000000001/stream")
+    response = await client_valid.get(
+        "/api/v1/submissions/00000000-0000-0000-0000-000000000001/stream"
+    )
     assert response.status_code == 401
 
 
 async def test_invalid_query_param_returns_401(client_empty: AsyncClient):
     """Invalid ?api_key= value → 401."""
-    response = await client_empty.get("/api/v1/submissions/00000000-0000-0000-0000-000000000001/stream?api_key=wrong-key")
+    response = await client_empty.get(
+        "/api/v1/submissions/00000000-0000-0000-0000-000000000001/stream?api_key=wrong-key"
+    )
     assert response.status_code == 401

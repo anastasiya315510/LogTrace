@@ -1,4 +1,4 @@
-# NemoTrace — Demo Video Script
+wipu# NemoTrace — Demo Video Script
 **Target length: ~2:45 — stay under 3:00**
 
 ---
@@ -77,7 +77,20 @@ From first error to full report: under two minutes."
 
 ---
 
-## SCENE 5 — Closing (2:10 – 2:45)
+## SCENE 5 — This Is Production-Ready (2:10 – 2:30)
+
+> *Screen: Streamlit portal sidebar showing a list of past incidents.*
+
+**Say:**
+"Here's what makes this useful in a real environment.
+
+There's no reset button in production. The moment the debounce window clears — two minutes after the last spike — NemoTrace is watching again. A second incident triggers a second report, automatically. Every spike gets its own root cause analysis, stored in Postgres, visible here in the sidebar.
+
+Your on-call engineer wakes up to a list of incidents — each one already diagnosed. Not raw logs. Not alerts. Answers."
+
+---
+
+## SCENE 6 — Closing (2:30 – 2:45)
 
 > *Screen: stay on the completed incident report.*
 
@@ -109,6 +122,7 @@ NemoTrace brings mean time to resolution from hours to minutes."
 - [ ] Progress bar animates in real time
 - [ ] RCA text streams word by word
 - [ ] Confidence score is visible and > 0
+- [ ] Streamlit sidebar shows list of past incidents (Scene 5)
 - [ ] All four key phrases spoken out loud
 - [ ] Audio is clean, no background noise
 - [ ] Video is public on YouTube before submitting

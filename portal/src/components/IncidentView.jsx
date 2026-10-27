@@ -211,7 +211,7 @@ export default function IncidentView({ incidentId, submissionId, onBack }) {
   function downloadReport() {
     const now = new Date().toISOString()
     const lines = [
-      `# NemoTrace Incident Report`,
+      `# LogTrace Incident Report`,
       ``,
       `**Generated:** ${now}  `,
       `**Incident ID:** \`${incidentId}\`  `,
@@ -262,14 +262,14 @@ export default function IncidentView({ incidentId, submissionId, onBack }) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `nemotrace-incident-${incidentId?.slice(0, 8) ?? 'report'}.md`
+    a.download = `logtrace-incident-${incidentId?.slice(0, 8) ?? 'report'}.md`
     a.click()
     URL.revokeObjectURL(url)
   }
 
   function downloadPdf() {
     const prev = document.title
-    document.title = `NemoTrace — Incident ${incidentId?.slice(0, 8) ?? 'report'}`
+    document.title = `LogTrace — Incident ${incidentId?.slice(0, 8) ?? 'report'}`
     window.print()
     document.title = prev
   }

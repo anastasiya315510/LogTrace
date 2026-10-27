@@ -65,10 +65,10 @@ export default function DemoPanel({ demoStatus, onStatusChange, onLogout }) {
       <div className="flex items-center gap-3">
         <div className="w-9 h-9 rounded-xl flex items-center justify-center"
           style={{ background: 'rgba(127,157,181,0.1)', border: '1px solid rgba(127,157,181,0.2)', boxShadow: '0 0 16px rgba(127,157,181,0.15)' }}>
-          <img src="/icon.svg" alt="NemoTrace" style={{ width: 20, height: 20 }} />
+          <img src="/icon.svg" alt="LogTrace" style={{ width: 20, height: 20 }} />
         </div>
         <div>
-          <span className="font-bold text-lg tracking-tight leading-none" style={{ color: 'var(--text)' }}>NemoTrace</span>
+          <span className="font-bold text-lg tracking-tight leading-none" style={{ color: 'var(--text)' }}>LogTrace</span>
           <p className="text-xs font-medium leading-none mt-1" style={{ color: 'var(--text-2)' }}>AI Log Intelligence</p>
         </div>
       </div>

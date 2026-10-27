@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { uploadLogs, getSubmission, getSubmissionIncidents, getUploadConfig } from '../api'
 
 // ── localStorage history ─────────────────────────────────────────────────────
-const HISTORY_KEY = 'nemotrace_upload_history'
+const HISTORY_KEY = 'logtrace_upload_history'
 const HISTORY_MAX = 20
 function loadHistory() { try { return JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]') } catch { return [] } }
 function saveHistory(e) { localStorage.setItem(HISTORY_KEY, JSON.stringify(e.slice(0, HISTORY_MAX))) }

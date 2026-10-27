@@ -1,15 +1,15 @@
 const BASE_URL = ''
 
 export function getStoredApiKey() {
-  return localStorage.getItem('nemotrace_api_key') || ''
+  return localStorage.getItem('logtrace_api_key') || ''
 }
 
 export function setStoredApiKey(key) {
-  localStorage.setItem('nemotrace_api_key', key)
+  localStorage.setItem('logtrace_api_key', key)
 }
 
 export function clearStoredApiKey() {
-  localStorage.removeItem('nemotrace_api_key')
+  localStorage.removeItem('logtrace_api_key')
 }
 
 async function apiFetch(path, options = {}) {

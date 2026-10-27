@@ -1,8 +1,8 @@
-# NemoTrace
+# LogTrace
 
 **AI-powered log intelligence for microservice environments.**
 
-NemoTrace ingests raw log streams from your services, automatically detects anomaly spikes, and runs a two-stage AI pipeline to produce structured incident reports — complete with root cause, cascade timeline, fix suggestions, and an interactive Q&A chat.
+LogTrace ingests raw log streams from your services, automatically detects anomaly spikes, and runs a two-stage AI pipeline to produce structured incident reports — complete with root cause, cascade timeline, fix suggestions, and an interactive Q&A chat.
 
 Built for the [NVIDIA × Nebius Global AI Hackathon](https://nebius.com/hackathon) — **Best Apps and Agents Track**.
 
@@ -48,11 +48,11 @@ NEBIUS_API_KEY=          # Nebius Token Factory key
 NEBIUS_BASE_URL=https://api.studio.nebius.ai/v1
 NEBIUS_STORAGE_ACCESS_KEY_ID=
 NEBIUS_STORAGE_SECRET_KEY=
-OBJECT_STORAGE_BUCKET=nemotrace-submissions
+OBJECT_STORAGE_BUCKET=logtrace-submissions
 OBJECT_STORAGE_ENDPOINT=https://storage.eu-north1.nebius.cloud
 TAVILY_API_KEY=
 DEMO_API_KEY=dev-demo-key
-DATABASE_URL=postgresql+asyncpg://nemotrace:nemotrace@postgres:5432/nemotrace
+DATABASE_URL=postgresql+asyncpg://logtrace:logtrace@postgres:5432/logtrace
 REDIS_URL=redis://redis:6379/0
 ```
 
@@ -109,7 +109,7 @@ bash scripts/dev.sh logs     # tail all logs with color coding
 bash scripts/dev.sh logs api # tail a single service log
 ```
 
-Logs are written to `/tmp/nemotrace/*.log`. PIDs are stored in `/tmp/nemotrace/*.pid`.
+Logs are written to `/tmp/logtrace/*.log`. PIDs are stored in `/tmp/logtrace/*.pid`.
 
 ---
 
@@ -150,7 +150,7 @@ For a production deployment on Nebius AI Cloud:
 ```bash
 # On a Nebius VM with Docker installed:
 git clone <this-repo>
-cd nemotrace
+cd logtrace
 cp .env.example .env  # fill in your keys
 docker compose up -d
 

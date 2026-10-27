@@ -2,7 +2,7 @@
 
 ## Why
 
-Today is October 16 — 14 days before the hackathon deadline. The NemoTrace foundation
+Today is October 16 — 14 days before the hackathon deadline. The LogTrace foundation
 (API, DB schema, Redis infra, demo producers, portal) is solid and production-quality.
 However the three modules that make the system actually work — the Stream Processor,
 Stage-1 log pipeline, and Stage-2 AI pipeline — are empty stubs. Without them the demo

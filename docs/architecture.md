@@ -1,4 +1,4 @@
-# NemoTrace — Architecture
+# LogTrace — Architecture
 
 ```mermaid
 flowchart TD

@@ -142,7 +142,7 @@ async def test_header_auth_works(client_valid: AsyncClient):
     """X-API-Key header with a valid key → SSE stream opens (200)."""
     async with client_valid.stream(
         "GET",
-        "/api/v1/submissions/test-sub/stream",
+        "/api/v1/submissions/00000000-0000-0000-0000-000000000001/stream",
         headers={"X-API-Key": _VALID_KEY},
     ) as response:
         assert response.status_code == 200
@@ -152,7 +152,7 @@ async def test_query_param_auth_works(client_valid: AsyncClient):
     """?api_key= query param with a valid key → SSE stream opens (200)."""
     async with client_valid.stream(
         "GET",
-        f"/api/v1/submissions/test-sub/stream?api_key={_VALID_KEY}",
+        f"/api/v1/submissions/00000000-0000-0000-0000-000000000001/stream?api_key={_VALID_KEY}",
     ) as response:
         assert response.status_code == 200
 
@@ -161,7 +161,7 @@ async def test_both_header_wins(client_valid: AsyncClient):
     """When both header and query param are present, the header is used (200)."""
     async with client_valid.stream(
         "GET",
-        f"/api/v1/submissions/test-sub/stream?api_key={_VALID_KEY}",
+        f"/api/v1/submissions/00000000-0000-0000-0000-000000000001/stream?api_key={_VALID_KEY}",
         headers={"X-API-Key": _VALID_KEY},
     ) as response:
         assert response.status_code == 200
@@ -169,11 +169,11 @@ async def test_both_header_wins(client_valid: AsyncClient):
 
 async def test_no_auth_returns_401(client_valid: AsyncClient):
     """No header and no query param → 401."""
-    response = await client_valid.get("/api/v1/submissions/test-sub/stream")
+    response = await client_valid.get("/api/v1/submissions/00000000-0000-0000-0000-000000000001/stream")
     assert response.status_code == 401
 
 
 async def test_invalid_query_param_returns_401(client_empty: AsyncClient):
     """Invalid ?api_key= value → 401."""
-    response = await client_empty.get("/api/v1/submissions/test-sub/stream?api_key=wrong-key")
+    response = await client_empty.get("/api/v1/submissions/00000000-0000-0000-0000-000000000001/stream?api_key=wrong-key")
     assert response.status_code == 401

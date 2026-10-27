@@ -19,6 +19,7 @@ from httpx import ASGITransport, AsyncClient
 
 from api.dependencies import require_api_key
 from api.main import create_app
+from core.database import get_db
 from core.redis_client import get_redis
 from core.redis_keys import RedisKeys
 from db.models import ApiKey
@@ -60,6 +61,19 @@ class _FakeRedis:
 
     async def xlen(self, stream: str) -> int:
         return len(self.streams.get(stream, []))
+
+
+class _FakeDB:
+    """Minimal async DB stub — no real DB needed."""
+
+    async def execute(self, stmt):
+        return None
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_):
+        pass
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -236,6 +250,7 @@ async def test_missing_api_key_header_rejected(app):
     # as required). FastAPI returns 422 at parameter validation — no DB needed.
     application = create_app()
     application.dependency_overrides[get_redis] = lambda: _FakeRedis()
+    application.dependency_overrides[get_db] = lambda: _FakeDB()
 
     with patch("api.routers.ingest.get_settings", return_value=_mock_settings()):
         async with AsyncClient(

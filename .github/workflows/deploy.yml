@@ -46,7 +46,7 @@ jobs:
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
             set -euo pipefail
-            cd ~/nemotrace
+            cd ~/logtrace
 
             echo "── Pulling latest code ──────────────────────"
             git pull origin main

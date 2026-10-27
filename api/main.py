@@ -34,7 +34,7 @@ async def _seed_demo_api_key() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
-    log.info("nemotrace_starting", env=settings.model_config.get("env_file"))
+    log.info("logtrace_starting", env=settings.model_config.get("env_file"))
 
     # Create tables (idempotent in dev; production uses Alembic migrations)
     async with get_engine().begin() as conn:
@@ -52,12 +52,12 @@ async def lifespan(app: FastAPI):
 
     await close_redis()
     await get_engine().dispose()
-    log.info("nemotrace_stopped")
+    log.info("logtrace_stopped")
 
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="NemoTrace API",
+        title="LogTrace API",
         description=(
             "AI-powered log intelligence for microservice environments. "
             "Uses NVIDIA Nemotron Nano 8B and Ultra 253B via Nebius Token Factory."

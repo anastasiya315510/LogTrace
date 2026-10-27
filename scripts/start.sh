@@ -66,7 +66,7 @@ echo "Starting all services..."
 docker compose -f docker-compose.prod.yml up -d
 
 echo ""
-echo "✓ NemoTrace is running."
+echo "✓ LogTrace is running."
 echo "  Portal:  http://localhost/portal"
 echo "  API:     http://localhost/api/v1"
 echo "  Docs:    http://localhost/docs"

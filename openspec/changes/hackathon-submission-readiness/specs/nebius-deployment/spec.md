@@ -2,7 +2,7 @@
 
 ## Purpose
 
-NemoTrace must be deployable to a Nebius AI Cloud VM with a single command, producing a publicly accessible HTTPS URL that judges can use as the working demo.
+LogTrace must be deployable to a Nebius AI Cloud VM with a single command, producing a publicly accessible HTTPS URL that judges can use as the working demo.
 
 ## Requirements
 

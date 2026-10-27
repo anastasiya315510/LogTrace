@@ -154,9 +154,9 @@ html, body, #root {
     margin-bottom: 1rem;
   }
 
-  /* Print-specific NemoTrace watermark */
+  /* Print-specific LogTrace watermark */
   body::after {
-    content: 'NemoTrace — AI Log Intelligence';
+    content: 'LogTrace — AI Log Intelligence';
     display: block;
     position: fixed;
     bottom: 0.6cm;

@@ -100,7 +100,7 @@ async def trigger_cascade(
     """
     Inject a failure cascade scenario.
     Scenarios: pool_exhaustion (default) | memory_leak | slow_query
-    A shared trace_id is generated so NemoTrace can correlate all three services.
+    A shared trace_id is generated so LogTrace can correlate all three services.
     Stream Processor will auto-trigger within ~60 seconds.
     """
     current_phase = await redis.hget(RedisKeys.DEMO_STATE, "phase")

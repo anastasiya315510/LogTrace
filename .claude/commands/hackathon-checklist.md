@@ -1,6 +1,6 @@
 ---
 name: "Hackathon Checklist"
-description: "Run the full NemoTrace submission readiness checklist before pushing or submitting"
+description: "Run the full LogTrace submission readiness checklist before pushing or submitting"
 allowed-tools: Bash, Glob, Grep, Read
 category: "Quality"
 tags: ["hackathon", "submission", "checklist", "security"]

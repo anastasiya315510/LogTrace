@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy NemoTrace to the Nebius VM via SSH.
+# Deploy LogTrace to the Nebius VM via SSH.
 # Reads VM_HOST, VM_USER, VM_SSH_KEY_PATH from .env
 # Usage: bash scripts/deploy.sh
 set -euo pipefail
@@ -23,12 +23,12 @@ echo "── Deploying to $VM_USER@$VM_HOST ────────────
 echo "── Syncing .env ─────────────────────────────────────────"
 scp -i "$SSH_KEY" -o StrictHostKeyChecking=no \
   "$(dirname "$0")/../.env" \
-  "$VM_USER@$VM_HOST:~/nemotrace/.env"
+  "$VM_USER@$VM_HOST:~/logtrace/.env"
 
 # Pull latest code and restart
 $SSH bash <<'REMOTE'
 set -euo pipefail
-cd ~/nemotrace
+cd ~/logtrace
 
 echo "── Pulling latest code ──────────────────────────────────"
 git pull origin main

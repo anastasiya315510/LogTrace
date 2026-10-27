@@ -1,10 +1,10 @@
 ---
 name: hackathon-checklist
-description: Run the full NemoTrace hackathon submission readiness checklist. Verifies every requirement from the NVIDIA × Nebius hackathon rules — code quality, credentials, README, LICENSE, deployment config, demo URL readiness, and submission artifacts. Prints a stamped pass/fail report. Use before pushing to GitHub or submitting.
+description: Run the full LogTrace hackathon submission readiness checklist. Verifies every requirement from the NVIDIA × Nebius hackathon rules — code quality, credentials, README, LICENSE, deployment config, demo URL readiness, and submission artifacts. Prints a stamped pass/fail report. Use before pushing to GitHub or submitting.
 allowed-tools: Bash, Glob, Grep, Read
 ---
 
-Run the complete hackathon submission readiness checklist for NemoTrace.
+Run the complete hackathon submission readiness checklist for LogTrace.
 
 Check every submission requirement and print a final stamped report. Do not fix anything — only report. If the user says "fix it" after seeing the report, fix the specific failing items.
 
@@ -42,7 +42,7 @@ Run each check and collect results. At the end print the full report.
 ### Deployment
 
 - [ ] **docker-compose.prod.yml exists**
-- [ ] **nginx/nemotrace.conf exists**
+- [ ] **nginx/logtrace.conf exists**
 - [ ] **scripts/start.sh exists and is executable**
 - [ ] **.env.example is complete**: grep for all required vars — `NEBIUS_API_KEY`, `NEBIUS_STORAGE_ACCESS_KEY_ID`, `NEBIUS_STORAGE_SECRET_KEY`, `TAVILY_API_KEY`, `DATABASE_URL`, `REDIS_URL`
 
@@ -56,7 +56,7 @@ Run each check and collect results. At the end print the full report.
 
 ```
 ╔══════════════════════════════════════════════════════════╗
-║        NemoTrace — Hackathon Submission Checklist        ║
+║        LogTrace — Hackathon Submission Checklist        ║
 ║              NVIDIA × Nebius Global AI Hackathon         ║
 ╚══════════════════════════════════════════════════════════╝
 

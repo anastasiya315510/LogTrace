@@ -165,7 +165,7 @@ async def _enqueue_stage2(redis, incident_id: uuid.UUID, submission_id: uuid.UUI
         "INCIDENT_ID": str(incident_id),
         "SUBMISSION_ID": str(submission_id),
     }
-    log_path = f"/tmp/nemotrace/stage2_{str(incident_id)[:8]}.log"
+    log_path = f"/tmp/logtrace/stage2_{str(incident_id)[:8]}.log"
     try:
         # start_new_session=True detaches Stage 2 from Stage 1's process group
         # so it survives when Stage 1's event loop closes.

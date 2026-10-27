@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "NemoTrace API",
-    "description": "NemoTrace© — AI-powered log intelligence for microservice environments.\n\n**Auth:** All requests require `X-API-Key` header. Set the `api_key` variable in the active environment.\n\n**Quick start:**\n1. Import `NemoTrace.postman_environment.json` and set it as active.\n2. Set `api_key` to your key.\n3. Run the **End-to-End Demo Flow** folder in sequence — submission IDs and incident IDs chain automatically via post-response scripts.",
+    "name": "LogTrace API",
+    "description": "LogTrace© — AI-powered log intelligence for microservice environments.\n\n**Auth:** All requests require `X-API-Key` header. Set the `api_key` variable in the active environment.\n\n**Quick start:**\n1. Import `LogTrace.postman_environment.json` and set it as active.\n2. Set `api_key` to your key.\n3. Run the **End-to-End Demo Flow** folder in sequence — submission IDs and incident IDs chain automatically via post-response scripts.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "version": "1.0.0"
   },
@@ -397,7 +397,7 @@
 
     {
       "name": "Incidents",
-      "description": "Fetch the full root cause report, chat with NemoTrace about the incident, and export the report. The `incident_id` variable is auto-set by the List Incidents request.",
+      "description": "Fetch the full root cause report, chat with LogTrace about the incident, and export the report. The `incident_id` variable is auto-set by the List Incidents request.",
       "item": [
         {
           "name": "Get Incident Report — GET /api/v1/incidents/:id",
@@ -1160,7 +1160,7 @@
 
     {
       "name": "Connectors",
-      "description": "Manage log source connectors. Each connector pulls or receives events from an external ecosystem (AWS CloudWatch, Kafka, Sentry, etc.) and normalises them into NemoTrace's event schema. All connectors feed the same Redis Streams pipeline — the analysis pipeline never knows the source.\n\n**Supported connector types:** `http_push`, `otlp`, `cloudwatch`, `gcp_logging`, `azure_monitor`, `kafka`, `kinesis`, `pubsub`, `datadog_webhook`, `sentry_webhook`, `pagerduty_webhook`, `github_actions`, `elasticsearch_pull`, `file_watch`, `s3_bucket`",
+      "description": "Manage log source connectors. Each connector pulls or receives events from an external ecosystem (AWS CloudWatch, Kafka, Sentry, etc.) and normalises them into LogTrace's event schema. All connectors feed the same Redis Streams pipeline — the analysis pipeline never knows the source.\n\n**Supported connector types:** `http_push`, `otlp`, `cloudwatch`, `gcp_logging`, `azure_monitor`, `kafka`, `kinesis`, `pubsub`, `datadog_webhook`, `sentry_webhook`, `pagerduty_webhook`, `github_actions`, `elasticsearch_pull`, `file_watch`, `s3_bucket`",
       "item": [
         {
           "name": "List Connectors — GET /api/v1/connectors",
@@ -1214,7 +1214,7 @@
               "raw": "{\n  \"name\": \"prod-payment-cloudwatch\",\n  \"connector_type\": \"cloudwatch\",\n  \"service_label\": \"payment-service\",\n  \"config\": {\n    \"log_group\": \"/ecs/payment-service\",\n    \"region\": \"us-east-1\",\n    \"aws_access_key_id\": \"AKIAIOSFODNN7EXAMPLE\",\n    \"aws_secret_access_key\": \"wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\",\n    \"poll_interval_seconds\": 15\n  }\n}",
               "options": { "raw": { "language": "json" } }
             },
-            "description": "Register a new AWS CloudWatch Logs connector. NemoTrace will poll the specified log group every 15 seconds, normalise each log event, and write it to the `payment-service` Redis Stream.\n\nCredentials are encrypted at rest using AES-256 and are never returned by any GET endpoint."
+            "description": "Register a new AWS CloudWatch Logs connector. LogTrace will poll the specified log group every 15 seconds, normalise each log event, and write it to the `payment-service` Redis Stream.\n\nCredentials are encrypted at rest using AES-256 and are never returned by any GET endpoint."
           },
           "event": [
             {
@@ -1262,10 +1262,10 @@
             "url": { "raw": "{{base_url}}/api/v1/connectors", "host": ["{{base_url}}"], "path": ["api","v1","connectors"] },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"prod-order-kafka\",\n  \"connector_type\": \"kafka\",\n  \"service_label\": \"order-service\",\n  \"config\": {\n    \"brokers\": [\"kafka-broker-1:9092\", \"kafka-broker-2:9092\"],\n    \"topic\": \"order-service.logs\",\n    \"group_id\": \"nemotrace-consumer\",\n    \"sasl_config\": {\n      \"mechanism\": \"SCRAM-SHA-256\",\n      \"username\": \"nemotrace\",\n      \"password\": \"secret\"\n    }\n  }\n}",
+              "raw": "{\n  \"name\": \"prod-order-kafka\",\n  \"connector_type\": \"kafka\",\n  \"service_label\": \"order-service\",\n  \"config\": {\n    \"brokers\": [\"kafka-broker-1:9092\", \"kafka-broker-2:9092\"],\n    \"topic\": \"order-service.logs\",\n    \"group_id\": \"logtrace-consumer\",\n    \"sasl_config\": {\n      \"mechanism\": \"SCRAM-SHA-256\",\n      \"username\": \"logtrace\",\n      \"password\": \"secret\"\n    }\n  }\n}",
               "options": { "raw": { "language": "json" } }
             },
-            "description": "Register a Kafka topic consumer. NemoTrace joins the consumer group and streams log events from the topic continuously."
+            "description": "Register a Kafka topic consumer. LogTrace joins the consumer group and streams log events from the topic continuously."
           },
           "event": [
             {
@@ -1291,7 +1291,7 @@
               "raw": "{\n  \"name\": \"sentry-frontend\",\n  \"connector_type\": \"sentry_webhook\",\n  \"service_label\": \"frontend-svc\",\n  \"config\": {\n    \"webhook_secret\": \"sentry-hmac-secret\",\n    \"project_slug\": \"frontend\"\n  }\n}",
               "options": { "raw": { "language": "json" } }
             },
-            "description": "Register a Sentry webhook connector. NemoTrace exposes a webhook endpoint at `POST /api/v1/connectors/{connector_id}/webhook` that Sentry posts error events to. Configure this URL in Sentry's webhook settings."
+            "description": "Register a Sentry webhook connector. LogTrace exposes a webhook endpoint at `POST /api/v1/connectors/{connector_id}/webhook` that Sentry posts error events to. Configure this URL in Sentry's webhook settings."
           },
           "event": [
             {

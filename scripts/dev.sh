@@ -5,7 +5,7 @@
 set -euo pipefail
 
 VENV=".venv/bin/activate"
-LOG_DIR="/tmp/nemotrace"
+LOG_DIR="/tmp/logtrace"
 mkdir -p "$LOG_DIR"
 
 start_all() {

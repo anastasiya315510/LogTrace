@@ -1,4 +1,4 @@
-# NemoTrace — Implementation Plan
+# LogTrace — Implementation Plan
 
 **Timeline:** September 19 – October 30, 2026 (41 calendar days, solo developer)
 **Strategy:** Demo-first. Happy path (ingest → auto-trigger → portal with topology + streaming RCA) must work by end of Week 3.
@@ -8,7 +8,7 @@
 ## Project Layout
 
 ```
-nemotrace/
+logtrace/
 ├── api/
 │   ├── main.py                      # app factory, lifespan, router registration
 │   ├── routers/
@@ -109,7 +109,7 @@ class Settings(BaseSettings):
     nebius_base_url: str = "https://api.studio.nebius.ai/v1"
     nano_model_id: str = "nvidia/Llama-3.1-Nemotron-Nano-8B-Instruct"
     ultra_model_id: str = "nvidia/Llama-3.1-Nemotron-Ultra-253B-v1"
-    object_storage_bucket: str = "nemotrace-submissions"
+    object_storage_bucket: str = "logtrace-submissions"
     object_storage_endpoint: str
     aws_access_key_id: str
     aws_secret_access_key: str
@@ -507,7 +507,7 @@ No clicks required until the engineer opens the portal. The system finds the inc
 
 ### SOLID
 
-Every component in NemoTrace maps to a SOLID rule. Violating any of these is a code smell to catch in review.
+Every component in LogTrace maps to a SOLID rule. Violating any of these is a code smell to catch in review.
 
 **Single Responsibility Principle**
 Each class does exactly one thing. The line to draw: if you can describe what a class does without using "and", it has one responsibility.
@@ -611,7 +611,7 @@ await insert_incidents(incidents)           # raises DatabaseError with context
 
 ### Logging Best Practices (for Demo Producers and All Components)
 
-All log output — both from NemoTrace components and from demo producers — uses **structured JSON** via `structlog`. Every log line is a machine-readable event, not a string.
+All log output — both from LogTrace components and from demo producers — uses **structured JSON** via `structlog`. Every log line is a machine-readable event, not a string.
 
 **Standard fields on every event (producer output format):**
 
@@ -640,11 +640,11 @@ All log output — both from NemoTrace components and from demo producers — us
 | `CRITICAL` | Service is non-functional | `"Cannot connect to DB — all retries exhausted"` |
 
 **Rules:**
-- Always include `trace_id` on every event when one is active. The `trace_id` is what makes NemoTrace's correlation work — producers must propagate it on every event during a cascade, not just the first one.
+- Always include `trace_id` on every event when one is active. The `trace_id` is what makes LogTrace's correlation work — producers must propagate it on every event during a cascade, not just the first one.
 - Include `stack_trace` on `ERROR` and `CRITICAL` events. Nano classifies better when the stack trace is present, and Ultra produces a more accurate RCA.
 - Never log credentials, tokens, or PII (customer names, card numbers, emails). Use IDs only (`order_id`, `user_id`).
 - Include `duration_ms` on any event that involves a timed operation (DB call, HTTP call, cache lookup) — this is what reveals timeout patterns to Nemotron Ultra.
-- Log the failure at the point it occurs. Do not catch, swallow, and re-raise a generic exception three layers up. The log event at the source is what NemoTrace reads.
+- Log the failure at the point it occurs. Do not catch, swallow, and re-raise a generic exception three layers up. The log event at the source is what LogTrace reads.
 
 **Producer normal-mode event variety** — the demo logs must look real, not repetitive:
 
@@ -680,18 +680,18 @@ class StreamProcessor:
 
     async def run(self):
         # SCAN MATCH stream:ingest:* every 30s to discover new services
-        # XREADGROUP COUNT 200 BLOCK 1000 GROUP nemotrace-sp consumer-1
+        # XREADGROUP COUNT 200 BLOCK 1000 GROUP logtrace-sp consumer-1
         while True:
             streams = await self._discover_streams()
             messages = await self.redis.xreadgroup(
-                "nemotrace-sp", "sp-consumer-1",
+                "logtrace-sp", "sp-consumer-1",
                 {s: ">" for s in streams}, count=200, block=1000
             )
             for stream_name, entries in messages:
                 service = stream_name.split(":")[-1]
                 for entry_id, fields in entries:
                     await self._process_event(service, fields)
-                    await self.redis.xack(stream_name, "nemotrace-sp", entry_id)
+                    await self.redis.xack(stream_name, "logtrace-sp", entry_id)
 
     async def _check_spike_conditions(self, now: float):
         # Condition 1: single-service ERROR spike (≥ threshold in window_seconds)
@@ -1183,14 +1183,14 @@ CMD ["uv", "run", "streamlit", "run", "portal/app.py", \
 docker login cr.nebius.cloud --username oauth --password <token>
 
 # Build all three images (run from repo root)
-docker build -f docker/Dockerfile.api   -t cr.nebius.cloud/<REGISTRY_ID>/nemotrace-api:latest   .
-docker build -f docker/Dockerfile.jobs  -t cr.nebius.cloud/<REGISTRY_ID>/nemotrace-jobs:latest  .
-docker build -f docker/Dockerfile.portal -t cr.nebius.cloud/<REGISTRY_ID>/nemotrace-portal:latest .
+docker build -f docker/Dockerfile.api   -t cr.nebius.cloud/<REGISTRY_ID>/logtrace-api:latest   .
+docker build -f docker/Dockerfile.jobs  -t cr.nebius.cloud/<REGISTRY_ID>/logtrace-jobs:latest  .
+docker build -f docker/Dockerfile.portal -t cr.nebius.cloud/<REGISTRY_ID>/logtrace-portal:latest .
 
 # Push
-docker push cr.nebius.cloud/<REGISTRY_ID>/nemotrace-api:latest
-docker push cr.nebius.cloud/<REGISTRY_ID>/nemotrace-jobs:latest
-docker push cr.nebius.cloud/<REGISTRY_ID>/nemotrace-portal:latest
+docker push cr.nebius.cloud/<REGISTRY_ID>/logtrace-api:latest
+docker push cr.nebius.cloud/<REGISTRY_ID>/logtrace-jobs:latest
+docker push cr.nebius.cloud/<REGISTRY_ID>/logtrace-portal:latest
 ```
 
 #### Step 3 — Provision managed infrastructure on Nebius
@@ -1199,7 +1199,7 @@ docker push cr.nebius.cloud/<REGISTRY_ID>/nemotrace-portal:latest
 |---|---|---|
 | PostgreSQL | Nebius Managed PostgreSQL | Note the connection string; run `alembic upgrade head` from a one-off container or local machine pointed at the managed DB |
 | Redis | Nebius Managed Redis | Note host + port; no password in dev |
-| Object Storage | Nebius Object Storage | Create bucket `nemotrace-submissions`; create service account with `storage.uploader` role; generate static access key |
+| Object Storage | Nebius Object Storage | Create bucket `logtrace-submissions`; create service account with `storage.uploader` role; generate static access key |
 
 Run the migration against the managed DB before starting the API:
 ```bash
@@ -1212,17 +1212,17 @@ Create a Serverless Container (Nebius Console → Serverless → Containers):
 
 | Setting | Value |
 |---|---|
-| Image | `cr.nebius.cloud/<REGISTRY_ID>/nemotrace-api:latest` |
+| Image | `cr.nebius.cloud/<REGISTRY_ID>/logtrace-api:latest` |
 | Port | `8000` |
 | Min instances | `1` (avoid cold start during the demo) |
 | Memory | `512 MB` |
 | Concurrency | `16` |
 
-Set all env vars from `.env.example`. The endpoint URL becomes `NEMOTRACE_BASE_URL` for the portal.
+Set all env vars from `.env.example`. The endpoint URL becomes `LOGTRACE_BASE_URL` for the portal.
 
 #### Step 5 — Deploy portal as Nebius Serverless Endpoint
 
-Same process with `nemotrace-portal:latest`, port `8501`, env var `NEMOTRACE_API_URL=<API endpoint URL>`.
+Same process with `logtrace-portal:latest`, port `8501`, env var `LOGTRACE_API_URL=<API endpoint URL>`.
 
 #### Step 6 — Wire Nebius Serverless Jobs (replace direct-call stub)
 
@@ -1239,7 +1239,7 @@ async def trigger_analysis_job(
     """Submit a Nebius Serverless Job; return the job ID."""
     cmd = f"python -m jobs.stage{stage}.entrypoint"
     payload = {
-        "name": f"nemotrace-stage{stage}-{submission_id[:8]}",
+        "name": f"logtrace-stage{stage}-{submission_id[:8]}",
         "container": {
             "image": jobs_image,
             "command": cmd.split(),
@@ -1283,26 +1283,26 @@ Extend `.github/workflows/ci.yml` — runs only on pushes to `main`, after `lint
       - name: Build and push API image
         run: |
           docker build -f docker/Dockerfile.api \
-            -t cr.nebius.cloud/${{ vars.REGISTRY_ID }}/nemotrace-api:${{ github.sha }} \
-            -t cr.nebius.cloud/${{ vars.REGISTRY_ID }}/nemotrace-api:latest .
-          docker push cr.nebius.cloud/${{ vars.REGISTRY_ID }}/nemotrace-api:${{ github.sha }}
-          docker push cr.nebius.cloud/${{ vars.REGISTRY_ID }}/nemotrace-api:latest
+            -t cr.nebius.cloud/${{ vars.REGISTRY_ID }}/logtrace-api:${{ github.sha }} \
+            -t cr.nebius.cloud/${{ vars.REGISTRY_ID }}/logtrace-api:latest .
+          docker push cr.nebius.cloud/${{ vars.REGISTRY_ID }}/logtrace-api:${{ github.sha }}
+          docker push cr.nebius.cloud/${{ vars.REGISTRY_ID }}/logtrace-api:latest
 
       - name: Build and push Jobs image
         run: |
           docker build -f docker/Dockerfile.jobs \
-            -t cr.nebius.cloud/${{ vars.REGISTRY_ID }}/nemotrace-jobs:${{ github.sha }} \
-            -t cr.nebius.cloud/${{ vars.REGISTRY_ID }}/nemotrace-jobs:latest .
-          docker push cr.nebius.cloud/${{ vars.REGISTRY_ID }}/nemotrace-jobs:${{ github.sha }}
-          docker push cr.nebius.cloud/${{ vars.REGISTRY_ID }}/nemotrace-jobs:latest
+            -t cr.nebius.cloud/${{ vars.REGISTRY_ID }}/logtrace-jobs:${{ github.sha }} \
+            -t cr.nebius.cloud/${{ vars.REGISTRY_ID }}/logtrace-jobs:latest .
+          docker push cr.nebius.cloud/${{ vars.REGISTRY_ID }}/logtrace-jobs:${{ github.sha }}
+          docker push cr.nebius.cloud/${{ vars.REGISTRY_ID }}/logtrace-jobs:latest
 
       - name: Build and push Portal image
         run: |
           docker build -f docker/Dockerfile.portal \
-            -t cr.nebius.cloud/${{ vars.REGISTRY_ID }}/nemotrace-portal:${{ github.sha }} \
-            -t cr.nebius.cloud/${{ vars.REGISTRY_ID }}/nemotrace-portal:latest .
-          docker push cr.nebius.cloud/${{ vars.REGISTRY_ID }}/nemotrace-portal:${{ github.sha }}
-          docker push cr.nebius.cloud/${{ vars.REGISTRY_ID }}/nemotrace-portal:latest
+            -t cr.nebius.cloud/${{ vars.REGISTRY_ID }}/logtrace-portal:${{ github.sha }} \
+            -t cr.nebius.cloud/${{ vars.REGISTRY_ID }}/logtrace-portal:latest .
+          docker push cr.nebius.cloud/${{ vars.REGISTRY_ID }}/logtrace-portal:${{ github.sha }}
+          docker push cr.nebius.cloud/${{ vars.REGISTRY_ID }}/logtrace-portal:latest
 ```
 
 **GitHub secrets required:**
@@ -1332,9 +1332,9 @@ Add as a separate CI job (`integration-test`) that runs on `main` only, after `d
       postgres:
         image: postgres:15-alpine
         env:
-          POSTGRES_USER: nemotrace
-          POSTGRES_PASSWORD: nemotrace
-          POSTGRES_DB: nemotrace
+          POSTGRES_USER: logtrace
+          POSTGRES_PASSWORD: logtrace
+          POSTGRES_DB: logtrace
         options: >-
           --health-cmd pg_isready
           --health-interval 5s
@@ -1354,11 +1354,11 @@ Add as a separate CI job (`integration-test`) that runs on `main` only, after `d
       - name: Run migrations
         run: uv run alembic upgrade head
         env:
-          DATABASE_URL: postgresql+asyncpg://nemotrace:nemotrace@localhost/nemotrace
+          DATABASE_URL: postgresql+asyncpg://logtrace:logtrace@localhost/logtrace
       - name: Integration tests
         run: uv run pytest tests/integration/ -v --tb=short
         env:
-          DATABASE_URL: postgresql+asyncpg://nemotrace:nemotrace@localhost/nemotrace
+          DATABASE_URL: postgresql+asyncpg://logtrace:logtrace@localhost/logtrace
           REDIS_URL: redis://localhost:6379/0
 ```
 
@@ -1374,7 +1374,7 @@ async def export_report(incident_id: UUID, format: str = "md"):
 
 Template:
 ```markdown
-# NemoTrace Incident Report — {incident_id}
+# LogTrace Incident Report — {incident_id}
 **Root Cause:** {root_cause_service} / {root_cause_method}
 **Confidence:** {confidence_score}%
 **Services Involved:** {services_involved}

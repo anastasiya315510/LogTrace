@@ -1,7 +1,7 @@
 openapi: "3.1.0"
 
 info:
-  title: NemoTrace API
+  title: LogTrace API
   version: "0.1.0"
   description: >
     AI-powered log intelligence for microservice environments.
@@ -689,7 +689,7 @@ paths:
       summary: Inject cascade failure
       description: >
         Inject the 3-service cascade failure scenario.
-        A shared trace_id is generated so NemoTrace can correlate all three services.
+        A shared trace_id is generated so LogTrace can correlate all three services.
         Stream Processor will auto-trigger analysis within ~60 seconds.
       operationId: triggerCascade
       responses:

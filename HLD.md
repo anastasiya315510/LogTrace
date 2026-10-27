@@ -1,5 +1,5 @@
 
-# NemoTrace©
+# LogTrace©
 # High Level Design
 
 ---
@@ -23,14 +23,14 @@
 
 **Abstract:**
 
-NemoTrace© is an AI-powered log intelligence system for microservice environments. Given unstructured, disorganised logs from multiple services, NemoTrace correlates related events, identifies cascade failure chains, and applies NVIDIA Nemotron reasoning models — served via Nebius Token Factory — to pinpoint the root cause of an incident with a confidence score and a plain-language explanation. Engineers no longer need to manually grep through dozens of log files: they upload logs and receive a diagnosis in seconds.
+LogTrace© is an AI-powered log intelligence system for microservice environments. Given unstructured, disorganised logs from multiple services, LogTrace correlates related events, identifies cascade failure chains, and applies NVIDIA Nemotron reasoning models — served via Nebius Token Factory — to pinpoint the root cause of an incident with a confidence score and a plain-language explanation. Engineers no longer need to manually grep through dozens of log files: they upload logs and receive a diagnosis in seconds.
 
 The system features a two-model pipeline — both open-weight NVIDIA models served via Nebius Token Factory:
 
 - **`nvidia/Llama-3.1-Nemotron-Nano-8B-Instruct`** — rapid, batched per-event anomaly classification
 - **`nvidia/Llama-3.1-Nemotron-Ultra-253B-v1`** — deep causal reasoning and interactive Q&A
 
-Together with a real-time service topology graph and Tavily-powered fix suggestions, NemoTrace closes the full loop from detection to remediation.
+Together with a real-time service topology graph and Tavily-powered fix suggestions, LogTrace closes the full loop from detection to remediation.
 
 This document is the High Level Design (HLD) of the system, describing the system architecture, the main components and their relationships, the overall data flow and processing, and any external systems and dependencies.
 
@@ -83,14 +83,14 @@ This document is the High Level Design (HLD) of the system, describing the syste
 
 In modern microservice architectures, a single root failure in one service propagates silently across dependent services, producing a cascade of errors that appear in dozens of separate log files. Diagnosing the original cause requires an engineer to manually correlate timestamps, error codes, and stack traces across all affected services — a process that commonly takes two to four hours per incident and requires deep familiarity with the entire system.
 
-The NemoTrace© system eliminates this burden. It ingests raw logs from any number of microservices, normalises them into a unified schema, correlates related events into an incident chain, and applies two open-weight NVIDIA Nemotron models served via Nebius Token Factory:
+The LogTrace© system eliminates this burden. It ingests raw logs from any number of microservices, normalises them into a unified schema, correlates related events into an incident chain, and applies two open-weight NVIDIA Nemotron models served via Nebius Token Factory:
 
 - **Nemotron Nano 8B** (`nvidia/Llama-3.1-Nemotron-Nano-8B-Instruct`) — for fast, per-event anomaly classification (batched, async)
 - **Nemotron Ultra 253B** (`nvidia/Llama-3.1-Nemotron-Ultra-253B-v1`) — for deep causal reasoning over the full incident chain (streamed response)
 
 The output is a root cause report that names the originating service and method, assigns a confidence score (e.g. 87%), explains the cascade sequence step by step, visualises the service dependency graph, and optionally queries the Tavily search API to surface known solutions and documentation for the identified error pattern. After the initial report, engineers can ask follow-up questions in a built-in Q&A panel, powered by Nemotron Ultra with full incident context.
 
-NemoTrace is submitted to the **Best Apps and Agents Track** of the Nebius × NVIDIA Global AI Hackathon.
+LogTrace is submitted to the **Best Apps and Agents Track** of the Nebius × NVIDIA Global AI Hackathon.
 
 ---
 
@@ -119,9 +119,9 @@ NemoTrace is submitted to the **Best Apps and Agents Track** of the Nebius × NV
 | Nebius Object Storage | Nebius AI's S3-compatible object storage; used to store raw log data for historical submissions |
 | Redis Streams | A Redis data structure providing persistent, consumer-group–based message streaming with at-least-once delivery guarantees |
 | SSE | Server-Sent Events — a unidirectional HTTP streaming protocol used for real-time progress updates |
-| Log Ingest Endpoint | The NemoTrace HTTP endpoint that receives a continuous stream of log events pushed by microservices or log shippers |
-| Log Shipper | A lightweight agent (Fluent Bit, Vector, Logstash) running alongside a microservice that tails log files and forwards events to NemoTrace via HTTP |
-| Stream Processor | A long-running NemoTrace component that consumes the live event stream, detects anomaly spikes, and auto-triggers incident analysis |
+| Log Ingest Endpoint | The LogTrace HTTP endpoint that receives a continuous stream of log events pushed by microservices or log shippers |
+| Log Shipper | A lightweight agent (Fluent Bit, Vector, Logstash) running alongside a microservice that tails log files and forwards events to LogTrace via HTTP |
+| Stream Processor | A long-running LogTrace component that consumes the live event stream, detects anomaly spikes, and auto-triggers incident analysis |
 | Auto-Trigger | The automatic opening of an incident analysis when the Stream Processor detects a significant ERROR rate increase across services |
 | Tavily | A search API optimised for AI agents; used to surface known error patterns and solutions |
 | LLM | Large Language Model |
@@ -145,27 +145,27 @@ Engineers working with microservice systems face the following specific problems
 3. Cascade errors make the root cause invisible: the first service to surface an ERROR may not be the origin.
 4. Searching manually through logs scales poorly beyond 5–10 services.
 
-The NemoTrace© system must address all four problems. The system should have the following capabilities:
+The LogTrace© system must address all four problems. The system should have the following capabilities:
 
 ---
 
 #### 1. Log Ingestion
 
-NemoTrace supports **two ingestion modes**. The primary mode is **automatic streaming push** from live microservices; the secondary mode is **historical file upload** for post-mortem analysis of stored logs.
+LogTrace supports **two ingestion modes**. The primary mode is **automatic streaming push** from live microservices; the secondary mode is **historical file upload** for post-mortem analysis of stored logs.
 
 ---
 
 ##### 1a. Primary: Automatic Push from Services (Live Streaming)
 
-Microservices (or the log shippers running alongside them) push log events to NemoTrace in real time via a dedicated **Log Ingest Endpoint**. No manual action is required from the engineer. The system continuously monitors the incoming event stream and automatically triggers incident analysis when an anomaly pattern is detected.
+Microservices (or the log shippers running alongside them) push log events to LogTrace in real time via a dedicated **Log Ingest Endpoint**. No manual action is required from the engineer. The system continuously monitors the incoming event stream and automatically triggers incident analysis when an anomaly pattern is detected.
 
 **How services send logs:**
 
-Services can integrate with NemoTrace in one of the following ways, in order of preference:
+Services can integrate with LogTrace in one of the following ways, in order of preference:
 
 1. **Direct HTTP push** — the service calls `POST /api/v1/ingest` with a batch of JSON log events (recommended for services that already emit structured JSON). A single API call can carry up to 500 events.
-2. **Log shipper** — a lightweight shipper (Fluent Bit, Vector, or Logstash) runs as a sidecar or host daemon, tails the service's log files, and forwards events to NemoTrace's ingest endpoint via its built-in HTTP output plugin. **Zero application code change required** — only a shipper config file pointing to `POST /api/v1/ingest`.
-3. **OpenTelemetry Collector** — for services already using OTel, an HTTP exporter sends log records to NemoTrace's OTLP-compatible ingest path.
+2. **Log shipper** — a lightweight shipper (Fluent Bit, Vector, or Logstash) runs as a sidecar or host daemon, tails the service's log files, and forwards events to LogTrace's ingest endpoint via its built-in HTTP output plugin. **Zero application code change required** — only a shipper config file pointing to `POST /api/v1/ingest`.
+3. **OpenTelemetry Collector** — for services already using OTel, an HTTP exporter sends log records to LogTrace's OTLP-compatible ingest path.
 
 **Ingest endpoint behaviour:**
 
@@ -246,11 +246,11 @@ Key fields and their purpose:
 | `error_type` | Optional | Exception class name; improves root cause classification |
 | `stack_trace` | Optional | Full stack trace; improves Nemotron Ultra's diagnosis |
 
-The `trace_id` field is the single most valuable field for NemoTrace. When services propagate a `trace_id` header across HTTP or message queue calls, NemoTrace can group all events from a single request chain with 100% accuracy, bypassing the less reliable time-window correlation heuristic.
+The `trace_id` field is the single most valuable field for LogTrace. When services propagate a `trace_id` header across HTTP or message queue calls, LogTrace can group all events from a single request chain with 100% accuracy, bypassing the less reliable time-window correlation heuristic.
 
 ##### 2b. Supported Input Formats
 
-NemoTrace supports two input formats:
+LogTrace supports two input formats:
 
 1. **JSON lines** — the recommended format described above. Each line is a valid JSON object. The parser maps fields to the internal schema; unknown fields are stored in a `metadata` JSON column.
 2. **Plaintext** — for existing services that cannot be easily changed. Lines of the form `[TIMESTAMP] [LEVEL] service_name: message` or common variations. Regex-based extraction is applied; fields that cannot be extracted are stored as NULL.
@@ -434,7 +434,7 @@ If Tavily returns no results or is unavailable, the root cause report is deliver
 
 #### 7. Interactive Incident Q&A
 
-After the initial root cause report is delivered, the engineer may ask follow-up questions in the Investigation Portal's **"Ask NemoTrace"** chat panel. Each question is submitted to Nemotron Ultra 253B with:
+After the initial root cause report is delivered, the engineer may ask follow-up questions in the Investigation Portal's **"Ask LogTrace"** chat panel. Each question is submitted to Nemotron Ultra 253B with:
 
 - The full original incident prompt (all non-noise events, classifications, and topology)
 - The initial root cause analysis result
@@ -458,7 +458,7 @@ POST /api/v1/incidents/{incident_id}/chat
 
 #### 10. Connector System
 
-The Connector System makes NemoTrace source-agnostic. Any log source — whether it is your own microservice, a cloud provider's logging service, a message queue, or a third-party SaaS — integrates by implementing a single `BaseConnector` interface. The rest of the pipeline (Redis Streams → Stage 1 → Stage 2 → RCA) never changes regardless of where the data comes from.
+The Connector System makes LogTrace source-agnostic. Any log source — whether it is your own microservice, a cloud provider's logging service, a message queue, or a third-party SaaS — integrates by implementing a single `BaseConnector` interface. The rest of the pipeline (Redis Streams → Stage 1 → Stage 2 → RCA) never changes regardless of where the data comes from.
 
 ---
 
@@ -527,8 +527,8 @@ The Connector Runner calls `connect()` once, then iterates `stream()` indefinite
 | `kafka` | Stream — Kafka consumer group | Any service publishing logs to a Kafka topic | `brokers`, `topic`, `group_id`, `sasl_config?` |
 | `kinesis` | Stream — AWS Kinesis consumer | AWS services publishing to Kinesis | `stream_name`, `region`, `aws_credentials` |
 | `pubsub` | Stream — GCP Pub/Sub subscription | GCP services publishing to Pub/Sub | `project_id`, `subscription_id`, `credentials_json` |
-| `datadog_webhook` | Webhook — Datadog posts alerts to NemoTrace | Datadog monitors | `webhook_secret` |
-| `sentry_webhook` | Webhook — Sentry posts error events to NemoTrace | Sentry projects | `webhook_secret`, `project_slug` |
+| `datadog_webhook` | Webhook — Datadog posts alerts to LogTrace | Datadog monitors | `webhook_secret` |
+| `sentry_webhook` | Webhook — Sentry posts error events to LogTrace | Sentry projects | `webhook_secret`, `project_slug` |
 | `pagerduty_webhook` | Webhook — PagerDuty posts incident triggers | PagerDuty services | `webhook_secret` |
 | `github_actions` | Webhook — GitHub posts workflow failure events | GitHub repositories | `webhook_secret`, `repo_filter?` |
 | `elasticsearch_pull` | Pull — queries an Elasticsearch index on a schedule | Existing ELK stacks | `es_url`, `index_pattern`, `query_dsl`, `api_key` |
@@ -611,7 +611,7 @@ All registered connectors as nodes, grouped by ecosystem (AWS, GCP, Azure, Custo
 
 ```
 [CloudWatch]──────► payment-service ──┐
-[kafka-topic-logs]─► order-service   ──┼──► NemoTrace
+[kafka-topic-logs]─► order-service   ──┼──► LogTrace
 [http_push]────────► api-gateway     ──┘
 [sentry_webhook]───► frontend-svc
 ```
@@ -648,9 +648,9 @@ The Investigation Portal is a Streamlit web application deployed on Nebius Serve
      - **Empty state:** If topology has only one node (single-service incident), display a single centred node with the message "Single-service incident — no cascade detected."
    - **Cascade Timeline** — Mermaid sequence diagram generated dynamically from `cascade_chain_json`. Renders below the topology graph to show the time-ordered event flow between services.
    - **Root Cause Box** — prominent card at the top of the report: service name in bold, method name, confidence score rendered as a filled progress bar (green ≥ 80%, amber 60–79%, red < 60%). If confidence < 80%, alternative hypotheses are shown in a collapsed expander below.
-   - **Nemotron Ultra Explanation** — streamed text rendered in real time via `st.write_stream()`. Labelled "NemoTrace Analysis (Nemotron Ultra 253B)" with the Nebius + NVIDIA badge to make model attribution visible to judges.
+   - **Nemotron Ultra Explanation** — streamed text rendered in real time via `st.write_stream()`. Labelled "LogTrace Analysis (Nemotron Ultra 253B)" with the Nebius + NVIDIA badge to make model attribution visible to judges.
    - **Fix Suggestions** — displayed as a prominent card section immediately below the Root Cause Box (before the full explanation), not buried at the bottom. Each suggestion is a bordered card with: source title as a clickable link, 2-line excerpt, query type badge ("Remediation" or "Vulnerability"), and Tavily relevance score as a small star rating. Remediation suggestions are listed first; CVE/vulnerability results follow in a separate subsection. If Tavily returned no results, the card shows "No fix suggestions found — check service documentation manually" rather than being hidden.
-   - **Ask NemoTrace** — chat input panel for follow-up questions; responses streamed word-by-word. Each Q&A turn is shown in a chat bubble layout (user right, NemoTrace left) with timestamps.
+   - **Ask LogTrace** — chat input panel for follow-up questions; responses streamed word-by-word. Each Q&A turn is shown in a chat bubble layout (user right, LogTrace left) with timestamps.
    - **Export** — "Download Report" button (Markdown or PDF). The PDF includes the topology graph as a static PNG (generated via `streamlit-agraph`'s export or an `agraph` snapshot).
 4. **API Keys** — generate and revoke API keys for programmatic access.
 
@@ -660,7 +660,7 @@ The Investigation Portal is a Streamlit web application deployed on Nebius Serve
 
 #### 9. REST API
 
-The NemoTrace© REST API exposes both the live ingest path (for services and shippers) and the historical submission path (for file upload).
+The LogTrace© REST API exposes both the live ingest path (for services and shippers) and the historical submission path (for file upload).
 
 **Push live log events (primary — services and log shippers call this):**
 ```
@@ -743,10 +743,10 @@ All endpoints require an API key passed in the `X-API-Key` header.
 
 #### Primary Workflow — Automatic (Zero Manual Steps for the Engineer)
 
-1. **Setup (one-time, ops team):** A log shipper (Fluent Bit / Vector) is deployed as a sidecar on each microservice pod. Its configuration points the HTTP output to `POST /api/v1/ingest` with the team's NemoTrace API key. Alternatively, services that already emit structured JSON add a single log handler calling the ingest endpoint directly.
-2. **Normal operation:** Services push events continuously. NemoTrace buffers them in per-service Redis Streams. No incidents are opened while ERROR rates are normal.
+1. **Setup (one-time, ops team):** A log shipper (Fluent Bit / Vector) is deployed as a sidecar on each microservice pod. Its configuration points the HTTP output to `POST /api/v1/ingest` with the team's LogTrace API key. Alternatively, services that already emit structured JSON add a single log handler calling the ingest endpoint directly.
+2. **Normal operation:** Services push events continuously. LogTrace buffers them in per-service Redis Streams. No incidents are opened while ERROR rates are normal.
 3. **Incident occurs:** A cascade of errors propagates across payment-service, order-service, and api-gateway. Within 60 seconds the Stream Processor detects the ERROR spike across 3 services and auto-triggers an incident analysis.
-4. **Engineer opens the portal** (or receives a webhook notification): The incident is already being processed. NemoTrace displays real-time progress: *Correlating events → Classifying 420 events → Analysing with Nemotron Ultra...*
+4. **Engineer opens the portal** (or receives a webhook notification): The incident is already being processed. LogTrace displays real-time progress: *Correlating events → Classifying 420 events → Analysing with Nemotron Ultra...*
 5. The service topology graph renders as soon as correlation completes — before the full analysis is done.
 6. The Nemotron Ultra explanation streams word-by-word. The final report shows:
    - Topology graph: `payment-service → order-service → api-gateway → client` (colour-coded by cascade role)
@@ -765,7 +765,7 @@ All endpoints require an API key passed in the `X-API-Key` header.
 
 ### 2.3 Availability and Recovery
 
-The NemoTrace© system is designed to provide the following availability guarantees:
+The LogTrace© system is designed to provide the following availability guarantees:
 
 - The **Investigation Portal and REST API** should be available 99.5% of the time (approximately 43.8 hours of downtime per year).
 - **Log ingestion** (receiving submissions) should be available at all times. In the event of a processing failure, the raw submission is retained in Nebius Object Storage and reprocessed upon recovery.
@@ -857,7 +857,7 @@ Recovery Time Objectives:
 - The full stack (postgres, redis, api, stream_processor, nginx) runs on a single **Nebius VM** (GPU or CPU; the API services are CPU-bound — model inference calls go to Nebius Token Factory over the network).
 - **One-command startup**: `./scripts/start.sh` performs pre-flight env-var validation, builds images, starts infrastructure, runs Alembic migrations, and brings up all services. The portal is then reachable at `http://<host>/portal`.
 - **nginx** (port 80) terminates HTTP and reverse-proxies to the FastAPI container, with `proxy_buffering off` on SSE endpoints so progress events are delivered in real time.
-- Raw log files are stored in **Nebius Object Storage** (`nemotrace-submissions` bucket, S3-compatible via boto3).
+- Raw log files are stored in **Nebius Object Storage** (`logtrace-submissions` bucket, S3-compatible via boto3).
 - All source code is version-controlled in a public GitHub repository (MIT licence).
 - The repository includes `README.md` with full setup instructions, `.env.example`, `docker-compose.yml` for single-command local startup, and a `demo/` directory with pre-crafted sample log files. The README must include the following sections to meet hackathon submission requirements:
   - **"How NVIDIA Nemotron is used"** — two-model pipeline: Nano 8B for batched classification, Ultra 253B for streaming RCA and Q&A; both served via Nebius Token Factory.
@@ -880,7 +880,7 @@ Recovery Time Objectives:
 
 ### 2.9 Backward Compatibility
 
-The NemoTrace© REST API is versioned with a `v1` prefix. Future breaking changes are introduced under a `v2` prefix while `v1` remains available for 90 days. Database schema changes are managed using Alembic migration scripts.
+The LogTrace© REST API is versioned with a `v1` prefix. Future breaking changes are introduced under a `v2` prefix while `v1` remains available for 90 days. Database schema changes are managed using Alembic migration scripts.
 
 ---
 
@@ -892,20 +892,20 @@ The NemoTrace© REST API is versioned with a `v1` prefix. Future breaking change
 
 ```mermaid
 C4Context
-    title NemoTrace — System Context
+    title LogTrace — System Context
     Person(engineer, "Engineer", "Views auto-triggered incident reports, asks follow-up questions, optionally uploads historical logs")
-    System(nemotrace, "NemoTrace©", "AI-powered log intelligence: ingests live microservice logs, auto-detects anomalies, and identifies root causes")
-    System_Ext(microservices, "Microservices", "Push structured log events to NemoTrace in real time via HTTP or log shipper")
+    System(logtrace, "LogTrace©", "AI-powered log intelligence: ingests live microservice logs, auto-detects anomalies, and identifies root causes")
+    System_Ext(microservices, "Microservices", "Push structured log events to LogTrace in real time via HTTP or log shipper")
     System_Ext(nebius_tf, "Nebius Token Factory", "Serves NVIDIA Nemotron Nano 8B and Ultra 253B via OpenAI-compatible API")
     System_Ext(nebius_jobs, "Nebius Serverless Jobs", "Runs asynchronous log analysis pipelines")
     System_Ext(nebius_obj, "Nebius Object Storage", "Stores raw log data for historical submissions")
     System_Ext(tavily, "Tavily Search API", "Returns ranked web results for fix suggestions and CVE lookups")
-    Rel(microservices, nemotrace, "Push log events continuously", "HTTPS POST /api/v1/ingest")
-    Rel(engineer, nemotrace, "Views reports, asks Q&A questions, optionally uploads historical logs", "HTTPS")
-    Rel(nemotrace, nebius_tf, "Classifies events and reasons over incidents", "HTTPS / OpenAI API")
-    Rel(nemotrace, nebius_jobs, "Submits analysis pipeline jobs", "HTTPS")
-    Rel(nemotrace, nebius_obj, "Stores and retrieves historical log files", "HTTPS / S3 API")
-    Rel(nemotrace, tavily, "Searches for remediation and CVE information", "HTTPS")
+    Rel(microservices, logtrace, "Push log events continuously", "HTTPS POST /api/v1/ingest")
+    Rel(engineer, logtrace, "Views reports, asks Q&A questions, optionally uploads historical logs", "HTTPS")
+    Rel(logtrace, nebius_tf, "Classifies events and reasons over incidents", "HTTPS / OpenAI API")
+    Rel(logtrace, nebius_jobs, "Submits analysis pipeline jobs", "HTTPS")
+    Rel(logtrace, nebius_obj, "Stores and retrieves historical log files", "HTTPS / S3 API")
+    Rel(logtrace, tavily, "Searches for remediation and CVE information", "HTTPS")
 ```
 
 ---
@@ -914,7 +914,7 @@ C4Context
 
 ```mermaid
 C4Container
-    title NemoTrace — Container Diagram
+    title LogTrace — Container Diagram
 
     Person(engineer, "Engineer")
     System_Ext(svc, "Any Log Source (microservices, cloud, webhooks, queues)")
@@ -1260,15 +1260,15 @@ erDiagram
 
 #### Nebius AI Platform Usage Summary
 
-The following table consolidates all Nebius services used by NemoTrace. This is the authoritative reference for the hackathon submission description, README, and demo video narration.
+The following table consolidates all Nebius services used by LogTrace. This is the authoritative reference for the hackathon submission description, README, and demo video narration.
 
-| Nebius Service | Role in NemoTrace | Where Specified |
+| Nebius Service | Role in LogTrace | Where Specified |
 |---|---|---|
 | **Token Factory — Nemotron Nano 8B** (`nvidia/Llama-3.1-Nemotron-Nano-8B-Instruct`) | Batched anomaly classification — 20 events per call, 10 parallel async calls, ~200 events/sec throughput | §2.1.4, Stage-2 Job, ADR-004 |
 | **Token Factory — Nemotron Ultra 253B** (`nvidia/Llama-3.1-Nemotron-Ultra-253B-v1`) | Streaming root cause analysis (`stream: true`) + interactive multi-turn Q&A with full incident context | §2.1.5, §2.1.7, ADR-005 |
 | **Serverless Jobs** | Two-stage async analysis pipeline: Stage 1 (parse + correlate), Stage 2 (classify + RCA + fix suggestions) — no always-on GPU infrastructure needed | §2.8, ADR-003 |
 | **Serverless Endpoints** | Hosts the FastAPI REST API and Streamlit Investigation Portal; auto-scales to ≥ 10 concurrent instances | §2.8 |
-| **Object Storage** (`nemotrace-submissions` bucket) | Durable storage for raw historical log files; S3-compatible; files deleted after Stage-1 processing | §2.1.1b, ADR-001 |
+| **Object Storage** (`logtrace-submissions` bucket) | Durable storage for raw historical log files; S3-compatible; files deleted after Stage-1 processing | §2.1.1b, ADR-001 |
 
 All Nebius services are accessed via their public APIs; no Nebius-specific SDK beyond standard S3 (`boto3`) and the Nebius Jobs REST API is required.
 
@@ -1308,7 +1308,7 @@ Both models must support the OpenAI-compatible `/v1/chat/completions` endpoint. 
 
 **Nebius Serverless Endpoints** — auto-scaling to ≥ 10 concurrent instances.
 
-**Nebius Object Storage** — S3-compatible; pre-signed URL generation supported; `nemotrace-submissions` bucket provisioned; files deleted after Stage-1 processing.
+**Nebius Object Storage** — S3-compatible; pre-signed URL generation supported; `logtrace-submissions` bucket provisioned; files deleted after Stage-1 processing.
 
 **Tavily API** — dual-query fix suggestion search. Gracefully omitted from report if unavailable.
 
@@ -1370,7 +1370,7 @@ Both models must support the OpenAI-compatible `/v1/chat/completions` endpoint. 
 
 **Status:** Accepted
 
-**Decision:** The processing queue uses Redis Streams (`XADD` / `XREADGROUP` / `XACK`) with a named consumer group (`nemotrace-workers`).
+**Decision:** The processing queue uses Redis Streams (`XADD` / `XREADGROUP` / `XACK`) with a named consumer group (`logtrace-workers`).
 
 **Alternatives considered:**
 - Redis List (`LPUSH` / `BRPOP`) — rejected: no consumer groups; no per-message ACK; a crashed worker silently drops messages; no built-in dead-letter mechanism.
@@ -1437,11 +1437,11 @@ Both models must support the OpenAI-compatible `/v1/chat/completions` endpoint. 
 
 **Status:** Accepted
 
-**Decision:** All log sources integrate with NemoTrace through a `BaseConnector` abstract class. Each connector normalises its source-specific format into a `NormalizedEvent` and writes to the per-service Redis Stream. The rest of the pipeline is completely connector-agnostic. New sources are added by implementing `BaseConnector` and registering the class in `CONNECTOR_REGISTRY` — no other component changes.
+**Decision:** All log sources integrate with LogTrace through a `BaseConnector` abstract class. Each connector normalises its source-specific format into a `NormalizedEvent` and writes to the per-service Redis Stream. The rest of the pipeline is completely connector-agnostic. New sources are added by implementing `BaseConnector` and registering the class in `CONNECTOR_REGISTRY` — no other component changes.
 
 **Alternatives considered:**
 - **Source-specific branches in the parser** — rejected: every new source would require changes to a shared, growing parser module. The parser would accumulate knowledge of AWS, GCP, Kafka, Sentry, etc., violating the single-responsibility principle and making it impossible for external contributors to add sources.
-- **Universal adapter via OpenTelemetry Collector only** — rejected: OTel Collector is powerful but requires every source team to configure an OTel pipeline pointing to NemoTrace's OTLP endpoint. This is too high a barrier for teams that already have CloudWatch, Datadog, or Kafka set up with no OTel instrumentation.
+- **Universal adapter via OpenTelemetry Collector only** — rejected: OTel Collector is powerful but requires every source team to configure an OTel pipeline pointing to LogTrace's OTLP endpoint. This is too high a barrier for teams that already have CloudWatch, Datadog, or Kafka set up with no OTel instrumentation.
 - **Webhook-only** — rejected: pull sources (CloudWatch, GCP Logging) cannot push; requiring a webhook forces infrastructure changes on the source side.
 
 **Rationale:** The plugin pattern is used by every major log pipeline product for this exact reason: Logstash input plugins, Kafka Connect source connectors, Fluentd input plugins, OpenTelemetry receivers. The `NormalizedEvent` schema is the stable contract — connectors are isolated adapters with no shared state.
@@ -1461,10 +1461,10 @@ Both models must support the OpenAI-compatible `/v1/chat/completions` endpoint. 
 
 **Alternatives considered:**
 - File upload only — rejected: requires an engineer to manually collect and upload files during an active incident; defeats the purpose of an automated intelligence system.
-- Pull-based (NemoTrace polls service log endpoints) — rejected: requires NemoTrace to have network access and credentials to reach each service; creates tight coupling; not suitable for cloud-native environments.
+- Pull-based (LogTrace polls service log endpoints) — rejected: requires LogTrace to have network access and credentials to reach each service; creates tight coupling; not suitable for cloud-native environments.
 - OpenTelemetry Collector pipeline only — rejected: requires OTel instrumentation in every service; too high a barrier for integration.
 
-**Rationale:** HTTP push requires zero changes to existing services when using a log shipper sidecar. Log shippers (Fluent Bit, Vector, Logstash) are already widely deployed; pointing their HTTP output to NemoTrace is a one-line config change. The ingest endpoint is designed to be high-throughput and low-latency (writes only to Redis Streams in the hot path).
+**Rationale:** HTTP push requires zero changes to existing services when using a log shipper sidecar. Log shippers (Fluent Bit, Vector, Logstash) are already widely deployed; pointing their HTTP output to LogTrace is a one-line config change. The ingest endpoint is designed to be high-throughput and low-latency (writes only to Redis Streams in the hot path).
 
 **Trade-offs:** The Stream Processor is a long-running stateful component — it cannot run as a serverless function. It must be deployed as a persistent container alongside the API. This adds a small amount of operational complexity but is fully handled by Docker Compose and Kubernetes manifests.
 
@@ -1474,13 +1474,13 @@ Both models must support the OpenAI-compatible `/v1/chat/completions` endpoint. 
 
 **Status:** Accepted
 
-**Decision:** PostgreSQL 15 is used as the single persistent store for all NemoTrace data. The `log_events` table uses a composite B-tree index on `(submission_id, level, timestamp)` and a partial index on `trace_id` (where not null). No secondary database is introduced.
+**Decision:** PostgreSQL 15 is used as the single persistent store for all LogTrace data. The `log_events` table uses a composite B-tree index on `(submission_id, level, timestamp)` and a partial index on `trace_id` (where not null). No secondary database is introduced.
 
 ---
 
 #### Data Profile Analysis
 
-NemoTrace stores two fundamentally different data profiles, which drove this decision:
+LogTrace stores two fundamentally different data profiles, which drove this decision:
 
 | Profile | Tables | Characteristics |
 |---------|--------|----------------|
@@ -1517,7 +1517,7 @@ All three patterns are point lookups or narrow range scans fully covered by two 
 | Fit for relational tables | Very poor — no JOINs, no ACID, no aggregations; `incident_analyses` and `fix_suggestions` cannot be modelled naturally |
 | Operational cost | Extremely high — JVM tuning, compaction management, careful partition key design required; cluster of 3+ nodes for production; `ALLOW FILTERING` queries are banned |
 | Query flexibility | Very low — every query pattern must be anticipated at schema design time; ad-hoc correlation queries are not possible |
-| Verdict | Rejected. Cassandra solves a write-throughput problem NemoTrace does not have at hackathon scale (50 submissions/day = ~100K events/day is trivially handled by PostgreSQL). The operational burden and query limitations far outweigh the benefit. |
+| Verdict | Rejected. Cassandra solves a write-throughput problem LogTrace does not have at hackathon scale (50 submissions/day = ~100K events/day is trivially handled by PostgreSQL). The operational burden and query limitations far outweigh the benefit. |
 | When to reconsider | If ingestion reaches 10M+ events/day across thousands of services in a multi-tenant SaaS product |
 
 **Elasticsearch**
@@ -1528,7 +1528,7 @@ All three patterns are point lookups or narrow range scans fully covered by two 
 | Fit for relational tables | Poor — not a transactional store; no foreign keys; not suitable for `api_keys` (authentication), `submissions` (status tracking), `incident_analyses` (conversation history) |
 | Unique capability | Would enable a **"search logs"** feature in the portal that PostgreSQL cannot support efficiently (full-text search across millions of `message` fields) |
 | Operational cost | High — JVM, 3+ nodes for HA, index mapping management, expensive memory requirements (1 GB+ per node) |
-| Verdict | Rejected for now. The primary use case (correlation + LLM analysis) does not require full-text search — NemoTrace queries events by `submission_id` and `level`, not by message content. Elasticsearch would add significant operational cost for a feature not in scope. |
+| Verdict | Rejected for now. The primary use case (correlation + LLM analysis) does not require full-text search — LogTrace queries events by `submission_id` and `level`, not by message content. Elasticsearch would add significant operational cost for a feature not in scope. |
 | When to reconsider | If a "search across all historical incidents by keyword" feature is added to the portal. At that point, adding Elasticsearch as a secondary search index (with PostgreSQL remaining the source of truth) is the right pattern. |
 
 **TimescaleDB (PostgreSQL extension)**
@@ -1675,7 +1675,7 @@ The Stream Processor is the **current highest priority** — it is the only rema
 
 ### 9.1 Language — Python 3.12
 
-All components of NemoTrace are written in **Python 3.12**.
+All components of LogTrace are written in **Python 3.12**.
 
 **Why Python:**
 

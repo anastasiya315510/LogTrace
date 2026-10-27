@@ -1,4 +1,4 @@
-wipu# NemoTrace — Demo Video Script
+wipu# LogTrace — Demo Video Script
 **Target length: ~2:45 — stay under 3:00**
 
 ---
@@ -11,13 +11,13 @@ wipu# NemoTrace — Demo Video Script
 "It's 2am. Your payment service is down. Orders are failing.
 You have hundreds of error lines across five services — and somewhere in there is the one thing that started it all.
 
-Finding it takes your team hours. NemoTrace fixes that."
+Finding it takes your team hours. LogTrace fixes that."
 
 ---
 
 ## SCENE 2 — Start Demo + Architecture (0:20 – 1:20)
 
-> *Screen: NemoTrace portal, Live Demo tab.*
+> *Screen: LogTrace portal, Live Demo tab.*
 
 **Say:**
 "Let me start the demo now — I'll trigger a cascade failure across three services."
@@ -28,7 +28,7 @@ Finding it takes your team hours. NemoTrace fixes that."
 
 > *Screen: architecture diagram. Point at each part as you say it.*
 
-"Your services send logs to NemoTrace — ingested in under 50 milliseconds straight into **Redis Streams** on a **Nebius VM**.
+"Your services send logs to LogTrace — ingested in under 50 milliseconds straight into **Redis Streams** on a **Nebius VM**.
 
 A stream processor watches continuously. The moment it sees an error spike — ten errors in sixty seconds — it fires automatically. No one has to click anything.
 
@@ -84,7 +84,7 @@ From first error to full report: under two minutes."
 **Say:**
 "Here's what makes this useful in a real environment.
 
-There's no reset button in production. The moment the debounce window clears — two minutes after the last spike — NemoTrace is watching again. A second incident triggers a second report, automatically. Every spike gets its own root cause analysis, stored in Postgres, visible here in the sidebar.
+There's no reset button in production. The moment the debounce window clears — two minutes after the last spike — LogTrace is watching again. A second incident triggers a second report, automatically. Every spike gets its own root cause analysis, stored in Postgres, visible here in the sidebar.
 
 Your on-call engineer wakes up to a list of incidents — each one already diagnosed. Not raw logs. Not alerts. Answers."
 
@@ -101,7 +101,7 @@ Your on-call engineer wakes up to a list of incidents — each one already diagn
 
 The whole stack — FastAPI, Redis, Postgres, Nginx — runs in Docker on a **Nebius VM**. One command to start.
 
-NemoTrace brings mean time to resolution from hours to minutes."
+LogTrace brings mean time to resolution from hours to minutes."
 
 ---
 

@@ -25,6 +25,6 @@ The hackathon submission deadline is October 30, 2026. The backend pipeline, por
 
 - `api/dependencies.py` — new `require_api_key_sse` dependency that accepts both header and `?api_key=` query param; used only on the stream endpoint to avoid weakening header-only auth elsewhere.
 - `api/routers/submissions.py` — swap `Depends(require_api_key)` → `Depends(require_api_key_sse)` on the `/stream` endpoint only.
-- New files: `docker-compose.prod.yml`, `nginx/nemotrace.conf`, `scripts/start.sh`.
+- New files: `docker-compose.prod.yml`, `nginx/logtrace.conf`, `scripts/start.sh`.
 - `HLD.md` §2.8 and §3.5 — update deployment approach description; add Nebius VM deployment instructions; mark Serverless Endpoints/Jobs as post-hackathon enhancement.
 - `portal/index.html` — add a health-check ping on load that sets a "Connected / Disconnected" badge.

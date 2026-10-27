@@ -1,5 +1,5 @@
 """
-Single source of truth for every Redis key and channel name in NemoTrace.
+Single source of truth for every Redis key and channel name in LogTrace.
 
 All modules (API, Stream Processor, Jobs, Portal) import from here.
 Changing a key name requires editing exactly one place.
@@ -38,7 +38,7 @@ class RedisKeys:
         return "queue:analysis"
 
     # ── Stream Processor consumer group ──────────────────────────────────────
-    SP_CONSUMER_GROUP = "nemotrace-sp"
+    SP_CONSUMER_GROUP = "logtrace-sp"
     SP_CONSUMER_NAME = "sp-consumer-1"
 
     # ── Stream Processor reset signal ─────────────────────────────────────────

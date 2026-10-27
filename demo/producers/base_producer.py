@@ -18,7 +18,7 @@ log = structlog.get_logger()
 
 class BaseProducer(ABC):
     """
-    Abstract base for a simulated microservice that pushes log events to NemoTrace.
+    Abstract base for a simulated microservice that pushes log events to LogTrace.
 
     Subclasses implement:
         run_normal(duration_seconds)  — push background traffic
@@ -55,7 +55,7 @@ class BaseProducer(ABC):
         duration_ms: int | None = None,
         extra: dict | None = None,
     ) -> dict:
-        """Build a single log event dict in NemoTrace's recommended JSON schema."""
+        """Build a single log event dict in LogTrace's recommended JSON schema."""
         event: dict = {
             "timestamp": datetime.now(UTC).isoformat(),
             "level": level,

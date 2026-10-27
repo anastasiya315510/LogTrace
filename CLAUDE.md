@@ -53,7 +53,7 @@ bash scripts/dev.sh logs     # tail all logs with color coding
 bash scripts/dev.sh logs api # tail a single service log
 ```
 
-Logs go to `/tmp/nemotrace/*.log`. PIDs stored in `/tmp/nemotrace/*.pid`.
+Logs go to `/tmp/logtrace/*.log`. PIDs stored in `/tmp/logtrace/*.pid`.
 
 ### Environment
 All config is loaded from `.env` via `pydantic-settings`. Required variables: `DATABASE_URL`, `REDIS_URL`, `NEBIUS_BASE_URL`, `NANO_MODEL_ID`, `ULTRA_MODEL_ID`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_ENDPOINT`, `DEMO_API_KEY`. See `core/config.py` for all settings and their defaults.
@@ -69,7 +69,7 @@ Upload limits (configurable, no hardcoded sizes in code):
 
 ## Architecture
 
-NemoTrace is a FastAPI service that ingests microservice log events, detects anomaly spikes via a Redis Stream Processor, then runs a two-stage AI pipeline (classify → RCA) to produce structured incident reports.
+LogTrace is a FastAPI service that ingests microservice log events, detects anomaly spikes via a Redis Stream Processor, then runs a two-stage AI pipeline (classify → RCA) to produce structured incident reports.
 
 ### Request / data flow
 

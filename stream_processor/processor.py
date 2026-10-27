@@ -257,8 +257,8 @@ class StreamProcessor:
 
     async def _dispatch_stage1(self, submission_id: uuid.UUID) -> None:
         env = {**os.environ, "SUBMISSION_ID": str(submission_id), "SOURCE_METHOD": "auto_trigger"}
-        log_path = f"/tmp/nemotrace/stage1_{str(submission_id)[:8]}.log"
-        os.makedirs("/tmp/nemotrace", exist_ok=True)
+        log_path = f"/tmp/logtrace/stage1_{str(submission_id)[:8]}.log"
+        os.makedirs("/tmp/logtrace", exist_ok=True)
         try:
             with open(log_path, "w") as log_fh:
                 proc = await asyncio.create_subprocess_exec(

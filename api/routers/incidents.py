@@ -190,7 +190,7 @@ async def export_report(
         services = services.get("services", [])
 
     lines = [
-        f"# NemoTrace Incident Report — {incident_id}",
+        f"# LogTrace Incident Report — {incident_id}",
         "",
         f"**Status:** {incident.status}",
         f"**Services Involved:** {', '.join(services)}",

@@ -2,6 +2,7 @@
 NemoTrace — Streamlit Investigation Portal
 Real-time incident monitoring, service topology visualisation, and PDF report export.
 """
+
 from __future__ import annotations
 
 import base64 as _b64
@@ -33,29 +34,30 @@ st.set_page_config(
 # ── Colour palette (matches React portal) ────────────────────────────────────
 
 COLORS = {
-    "root_cause":       "#C47D6D",
+    "root_cause": "#C47D6D",
     "propagated_error": "#C9A05A",
-    "symptom":          "#7F9DB5",
-    "unknown":          "#879477",
-    "success":          "#8FB5A0",
-    "info":             "#7F9DB5",
-    "warning":          "#C9A05A",
-    "error":            "#C47D6D",
-    "bg":               "#202427",
-    "card":             "#292E32",
-    "text":             "#E3E5E2",
+    "symptom": "#7F9DB5",
+    "unknown": "#879477",
+    "success": "#8FB5A0",
+    "info": "#7F9DB5",
+    "warning": "#C9A05A",
+    "error": "#C47D6D",
+    "bg": "#202427",
+    "card": "#292E32",
+    "text": "#E3E5E2",
 }
 
 ROLE_LABELS = {
-    "root_cause":       "Root Cause",
+    "root_cause": "Root Cause",
     "propagated_error": "Propagated",
-    "symptom":          "Symptom",
-    "unknown":          "Unknown",
+    "symptom": "Symptom",
+    "unknown": "Unknown",
 }
 
 # ── Custom CSS ─────────────────────────────────────────────────────────────────
 
-st.markdown("""
+st.markdown(
+    """
 <style>
   /* ── Full dark background ── */
   html, body,
@@ -141,17 +143,23 @@ st.markdown("""
     font-size: 0.75rem; font-weight: 700; flex-shrink: 0;
   }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 # ── API helpers ───────────────────────────────────────────────────────────────
 
+
 def api(method: str, path: str, **kwargs) -> dict | None:
     """Make an authenticated API call; return parsed JSON or None on error."""
-    base   = st.session_state.get("base_url", os.environ.get("API_BASE_URL", "http://localhost:8000")).rstrip("/")
+    base = st.session_state.get(
+        "base_url", os.environ.get("API_BASE_URL", "http://localhost:8000")
+    ).rstrip("/")
     api_key = st.session_state.get("api_key", "")
     try:
         resp = requests.request(
-            method, f"{base}{path}",
+            method,
+            f"{base}{path}",
             headers={"X-API-Key": api_key},
             timeout=10,
             **kwargs,
@@ -189,11 +197,11 @@ def fmt_dt(iso: str | None) -> str:
 
 
 STATUS_COLOR = {
-    "pending":     ("#879477", "rgba(135,148,119,0.15)"),
+    "pending": ("#879477", "rgba(135,148,119,0.15)"),
     "classifying": ("#7F9DB5", "rgba(127,157,181,0.15)"),
-    "analyzing":   ("#A89BC0", "rgba(168,155,192,0.15)"),
-    "complete":    ("#8FB5A0", "rgba(143,181,160,0.15)"),
-    "failed":      ("#C47D6D", "rgba(196,125,109,0.15)"),
+    "analyzing": ("#A89BC0", "rgba(168,155,192,0.15)"),
+    "complete": ("#8FB5A0", "rgba(143,181,160,0.15)"),
+    "failed": ("#C47D6D", "rgba(196,125,109,0.15)"),
 }
 
 
@@ -205,10 +213,12 @@ def status_badge_html(status: str) -> str:
         f'border:1px solid {color}40">{dot} {status}</span>'
     )
 
+
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 
 with st.sidebar:
-    st.markdown(f"""
+    st.markdown(
+        f"""
 <div style="display:flex;align-items:center;gap:10px;margin-bottom:2px">
   <div style="width:32px;height:32px;border-radius:9px;flex-shrink:0;
               background:rgba(127,157,181,0.1);border:1px solid rgba(127,157,181,0.2);
@@ -217,7 +227,9 @@ with st.sidebar:
   </div>
   <span style="font-size:1.05rem;font-weight:800;letter-spacing:-0.01em;color:#E3E5E2">NemoTrace</span>
 </div>
-""", unsafe_allow_html=True)
+""",
+        unsafe_allow_html=True,
+    )
     st.caption("AI Log Intelligence — Investigation Portal")
     st.divider()
 
@@ -229,7 +241,9 @@ with st.sidebar:
     )
     st.session_state["base_url"] = st.text_input(
         "API Base URL",
-        value=st.session_state.get("base_url", os.environ.get("API_BASE_URL", "http://localhost:8000")),
+        value=st.session_state.get(
+            "base_url", os.environ.get("API_BASE_URL", "http://localhost:8000")
+        ),
     )
     st.divider()
 
@@ -267,8 +281,8 @@ with st.sidebar:
         options=["pool_exhaustion", "memory_leak", "slow_query"],
         format_func=lambda x: {
             "pool_exhaustion": "DB Pool Exhaustion",
-            "memory_leak":     "Memory Leak / OOM",
-            "slow_query":      "Deadlock / Slow Query",
+            "memory_leak": "Memory Leak / OOM",
+            "slow_query": "Deadlock / Slow Query",
         }.get(x, x),
         label_visibility="collapsed",
     )
@@ -320,14 +334,14 @@ def _wrap(text: str, max_token: int = 70) -> str:
 
 def render_pdf(incident: dict, incident_id: str) -> bytes:
     """Generate a PDF report using fpdf2 (no external renderer needed)."""
-    conf_pct   = confidence_pct(incident.get("confidence_score"))
-    now        = datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M UTC")
-    cascade    = incident.get("cascade_chain") or []
-    fixes      = incident.get("fix_suggestions") or []
-    alts       = incident.get("alternative_hypotheses") or []
-    rca        = incident.get("cascade_explanation") or ""
+    conf_pct = confidence_pct(incident.get("confidence_score"))
+    now = datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M UTC")
+    cascade = incident.get("cascade_chain") or []
+    fixes = incident.get("fix_suggestions") or []
+    alts = incident.get("alternative_hypotheses") or []
+    rca = incident.get("cascade_explanation") or ""
     root_cause = incident.get("root_cause_service") or "—"
-    services   = ", ".join(incident.get("services_involved") or [])
+    services = ", ".join(incident.get("services_involved") or [])
 
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=18)
@@ -363,7 +377,9 @@ def render_pdf(incident: dict, incident_id: str) -> bytes:
     pdf.set_text_color(180, 83, 9)
     pdf.cell(0, 8, _safe(f"  {root_cause}"), ln=True)
     if conf_pct:
-        r, g, b = (5, 150, 105) if conf_pct >= 80 else (217, 119, 6) if conf_pct >= 60 else (220, 38, 38)
+        r, g, b = (
+            (5, 150, 105) if conf_pct >= 80 else (217, 119, 6) if conf_pct >= 60 else (220, 38, 38)
+        )
         pdf.set_font("Helvetica", "B", 28)
         pdf.set_text_color(r, g, b)
         pdf.cell(0, 14, f"{conf_pct}% confidence", ln=True)
@@ -375,7 +391,7 @@ def render_pdf(incident: dict, incident_id: str) -> bytes:
         for i, step in enumerate(cascade):
             svc = _safe(step.get("service") or step.get("name") or "?", 60)
             err = _safe(step.get("error", ""), 100)
-            ts  = _safe(step.get("timestamp", ""), 40)
+            ts = _safe(step.get("timestamp", ""), 40)
             pdf.set_font("Helvetica", "B", 10)
             pdf.set_text_color(17, 24, 39)
             pdf.cell(8, 6, f"{i+1}.", ln=False)
@@ -434,8 +450,8 @@ def render_pdf(incident: dict, incident_id: str) -> bytes:
     if fixes:
         section_title("Fix Suggestions  (Tavily)")
         for fix in fixes:
-            title   = _safe(fix.get("source_title") or fix.get("source_url", ""), 80)
-            url     = _safe(fix.get("source_url", ""), 80)  # truncate long URLs
+            title = _safe(fix.get("source_title") or fix.get("source_url", ""), 80)
+            url = _safe(fix.get("source_url", ""), 80)  # truncate long URLs
             excerpt = _safe((fix.get("excerpt") or "")[:200])
             pdf.set_font("Helvetica", "B", 9)
             pdf.set_text_color(37, 99, 235)
@@ -455,14 +471,24 @@ def render_pdf(incident: dict, incident_id: str) -> bytes:
         pdf.set_font("Helvetica", "", 9)
         pdf.set_text_color(55, 65, 81)
         for i, h in enumerate(alts, 1):
-            hyp_text = h if isinstance(h, str) else (h.get("hypothesis") if isinstance(h, dict) else str(h))
+            hyp_text = (
+                h
+                if isinstance(h, str)
+                else (h.get("hypothesis") if isinstance(h, dict) else str(h))
+            )
             raw_c = h.get("confidence") if isinstance(h, dict) else None
-            conf_str = f" ({round(raw_c * 100 if raw_c and raw_c <= 1 else raw_c)}% likely)" if raw_c else ""
+            conf_str = (
+                f" ({round(raw_c * 100 if raw_c and raw_c <= 1 else raw_c)}% likely)"
+                if raw_c
+                else ""
+            )
             pdf.multi_cell(0, 5, _safe(f"{i}. {hyp_text}{conf_str}"), new_x="LMARGIN", new_y="NEXT")
             if isinstance(h, dict) and h.get("reason"):
                 pdf.set_font("Helvetica", "", 8)
                 pdf.set_text_color(107, 114, 128)
-                pdf.multi_cell(0, 4, _wrap(_safe(f"   {h['reason']}")), new_x="LMARGIN", new_y="NEXT")
+                pdf.multi_cell(
+                    0, 4, _wrap(_safe(f"   {h['reason']}")), new_x="LMARGIN", new_y="NEXT"
+                )
                 pdf.set_font("Helvetica", "", 9)
                 pdf.set_text_color(55, 65, 81)
             pdf.ln(1)
@@ -471,48 +497,59 @@ def render_pdf(incident: dict, incident_id: str) -> bytes:
     pdf.set_y(-18)
     pdf.set_font("Helvetica", "", 7)
     pdf.set_text_color(156, 163, 175)
-    pdf.cell(0, 5, "Generated by NemoTrace  -  AI Log Intelligence  -  NVIDIA x Nebius Hackathon", align="C")
+    pdf.cell(
+        0,
+        5,
+        "Generated by NemoTrace  -  AI Log Intelligence  -  NVIDIA x Nebius Hackathon",
+        align="C",
+    )
 
     return bytes(pdf.output())
 
+
 # ── Topology graph ────────────────────────────────────────────────────────────
+
 
 def render_topology(topology: dict | None) -> None:
     if not topology or not topology.get("node_roles"):
         st.info("No topology data available yet.")
         return
 
-    node_roles  = topology.get("node_roles", {})
-    adjacency   = topology.get("adjacency", {})
+    node_roles = topology.get("node_roles", {})
+    adjacency = topology.get("adjacency", {})
     error_counts = topology.get("error_counts", {})
 
     nodes, edges = [], []
 
     for service, role in node_roles.items():
-        color     = COLORS.get(role, COLORS["unknown"])
-        count     = error_counts.get(service)
-        label     = f"{service}\n({count} err)" if count else service
-        is_root   = role == "root_cause"
-        nodes.append(Node(
-            id=service,
-            label=label,
-            color=color,
-            size=25 if is_root else 18,
-            font={"color": "#E3E5E2", "size": 11},
-            borderWidth=3 if is_root else 1,
-            borderWidthSelected=4,
-            shadow=is_root,
-        ))
+        color = COLORS.get(role, COLORS["unknown"])
+        count = error_counts.get(service)
+        label = f"{service}\n({count} err)" if count else service
+        is_root = role == "root_cause"
+        nodes.append(
+            Node(
+                id=service,
+                label=label,
+                color=color,
+                size=25 if is_root else 18,
+                font={"color": "#E3E5E2", "size": 11},
+                borderWidth=3 if is_root else 1,
+                borderWidthSelected=4,
+                shadow=is_root,
+            )
+        )
 
     for src, targets in adjacency.items():
-        for tgt in (targets or []):
-            edges.append(Edge(
-                source=src,
-                target=tgt,
-                color={"color": "rgba(227,229,226,0.25)", "highlight": "#7F9DB5"},
-                width=1.5,
-                arrows="to",
-            ))
+        for tgt in targets or []:
+            edges.append(
+                Edge(
+                    source=src,
+                    target=tgt,
+                    color={"color": "rgba(227,229,226,0.25)", "highlight": "#7F9DB5"},
+                    width=1.5,
+                    arrows="to",
+                )
+            )
 
     cfg = Config(
         width="100%",
@@ -538,18 +575,26 @@ def render_topology(topology: dict | None) -> None:
                 unsafe_allow_html=True,
             )
 
+
 # ── Incident detail view ──────────────────────────────────────────────────────
+
 
 def render_incident(incident_id: str) -> None:
     incident = api("GET", f"/api/v1/incidents/{incident_id}")
     if not incident:
         return
 
-    status     = incident.get("status", "unknown")
-    is_live    = status not in ("complete", "failed")
+    status = incident.get("status", "unknown")
+    is_live = status not in ("complete", "failed")
     root_cause = incident.get("root_cause_service")
-    conf_pct   = confidence_pct(incident.get("confidence_score"))
-    conf_color = COLORS["success"] if conf_pct >= 80 else COLORS["warning"] if conf_pct >= 60 else COLORS["error"]
+    conf_pct = confidence_pct(incident.get("confidence_score"))
+    conf_color = (
+        COLORS["success"]
+        if conf_pct >= 80
+        else COLORS["warning"]
+        if conf_pct >= 60
+        else COLORS["error"]
+    )
 
     # ── Header ──
     col_back, col_badge = st.columns([1, 5])
@@ -560,8 +605,11 @@ def render_incident(incident_id: str) -> None:
     with col_badge:
         st.markdown(status_badge_html(status), unsafe_allow_html=True)
 
-    st.markdown(f'<h2 style="color:#E3E5E2;font-size:1.6rem;font-weight:800;margin:12px 0 4px">'
-                f'{incident_id[:8]}…{incident_id[-4:]}</h2>', unsafe_allow_html=True)
+    st.markdown(
+        f'<h2 style="color:#E3E5E2;font-size:1.6rem;font-weight:800;margin:12px 0 4px">'
+        f"{incident_id[:8]}…{incident_id[-4:]}</h2>",
+        unsafe_allow_html=True,
+    )
     st.caption(f"Full ID: `{incident_id}`")
 
     # ── Metrics row ──
@@ -593,7 +641,7 @@ def render_incident(incident_id: str) -> None:
             f'<div class="metric-card">'
             f'<div class="metric-label">Status</div>'
             f'<div class="metric-value" style="font-size:1rem">'
-            f'{status_badge_html(status)}</div></div>',
+            f"{status_badge_html(status)}</div></div>",
             unsafe_allow_html=True,
         )
 
@@ -609,7 +657,7 @@ def render_incident(incident_id: str) -> None:
             st.markdown(
                 '<div style="background:#292E32;border:1px solid rgba(227,229,226,0.08);'
                 'border-radius:12px;padding:20px 24px;line-height:1.8;color:rgba(227,229,226,0.85)">'
-                '</div>',
+                "</div>",
                 unsafe_allow_html=True,
             )
             st.markdown(rca_text)
@@ -627,7 +675,7 @@ def render_incident(incident_id: str) -> None:
             for i, step in enumerate(cascade):
                 svc = step.get("service") or step.get("name") or "?"
                 err = step.get("error", "")
-                ts  = step.get("timestamp", "")
+                ts = step.get("timestamp", "")
                 color = _STEP_COLORS_PDF[i % len(_STEP_COLORS_PDF)]
                 st.markdown(
                     f'<div class="cascade-step">'
@@ -660,11 +708,11 @@ def render_incident(incident_id: str) -> None:
         fixes = incident.get("fix_suggestions") or []
         if fixes:
             for fix in fixes:
-                title   = fix.get("source_title") or fix.get("source_url", "")
-                url     = fix.get("source_url", "#")
+                title = fix.get("source_title") or fix.get("source_url", "")
+                url = fix.get("source_url", "#")
                 excerpt = fix.get("excerpt") or ""
-                qtype   = (fix.get("query_type") or "other").capitalize()
-                score   = fix.get("tavily_score") or 0
+                qtype = (fix.get("query_type") or "other").capitalize()
+                score = fix.get("tavily_score") or 0
                 with st.expander(f"**{title[:55]}…**" if len(title) > 55 else f"**{title}**"):
                     st.caption(f"{qtype} · relevance {round(score * 100)}%")
                     st.markdown(f"[{url}]({url})")
@@ -676,16 +724,24 @@ def render_incident(incident_id: str) -> None:
     # Alternative hypotheses
     alts = incident.get("alternative_hypotheses") or []
     if alts:
-        st.markdown('<div class="section-title">Alternative Hypotheses</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="section-title">Alternative Hypotheses</div>', unsafe_allow_html=True
+        )
         for i, h in enumerate(alts, 1):
             if isinstance(h, str):
                 text, conf, reason = h, None, None
             else:
-                text   = h.get("hypothesis") or str(h)
-                raw_c  = h.get("confidence")
-                conf   = round(raw_c * 100 if raw_c and raw_c <= 1 else (raw_c or 0)) if raw_c else None
+                text = h.get("hypothesis") or str(h)
+                raw_c = h.get("confidence")
+                conf = (
+                    round(raw_c * 100 if raw_c and raw_c <= 1 else (raw_c or 0)) if raw_c else None
+                )
                 reason = h.get("reason")
-            badge = f" &nbsp;<span style='font-size:.75rem;color:#879477'>{conf}% likely</span>" if conf else ""
+            badge = (
+                f" &nbsp;<span style='font-size:.75rem;color:#879477'>{conf}% likely</span>"
+                if conf
+                else ""
+            )
             st.markdown(f"**{i}.** {text}{badge}", unsafe_allow_html=True)
             if reason:
                 st.caption(f"  ↳ {reason}")
@@ -743,7 +799,9 @@ def render_incident(incident_id: str) -> None:
         time.sleep(3)
         st.rerun()
 
+
 # ── Submission view ───────────────────────────────────────────────────────────
+
 
 def render_submission(submission_id: str) -> None:
     sub = api("GET", f"/api/v1/submissions/{submission_id}")
@@ -751,11 +809,11 @@ def render_submission(submission_id: str) -> None:
         return
 
     status = sub.get("status", "unknown")
-    count  = sub.get("incident_count", 0)
+    count = sub.get("incident_count", 0)
 
     st.markdown(
         '<h2 style="color:#E3E5E2;font-size:1.5rem;font-weight:800;margin-bottom:4px">'
-        'Submission</h2>',
+        "Submission</h2>",
         unsafe_allow_html=True,
     )
     c1, c2, c3 = st.columns(3)
@@ -783,8 +841,9 @@ def render_submission(submission_id: str) -> None:
         st.rerun()
 
     # Incident list
-    st.markdown('<div class="section-title" style="margin-top:28px">Incidents</div>',
-                unsafe_allow_html=True)
+    st.markdown(
+        '<div class="section-title" style="margin-top:28px">Incidents</div>', unsafe_allow_html=True
+    )
     inc_data = api("GET", f"/api/v1/submissions/{submission_id}/incidents")
     incidents = inc_data.get("incidents", []) if inc_data else []
 
@@ -793,11 +852,17 @@ def render_submission(submission_id: str) -> None:
         return
 
     for inc in incidents:
-        iid   = str(inc.get("incident_id", ""))
+        iid = str(inc.get("incident_id", ""))
         istatus = inc.get("status", "?")
-        root  = inc.get("root_cause_service")
-        conf  = confidence_pct(inc.get("confidence_score"))
-        conf_c = COLORS["success"] if conf >= 80 else COLORS["warning"] if conf >= 60 else COLORS["error"]
+        root = inc.get("root_cause_service")
+        conf = confidence_pct(inc.get("confidence_score"))
+        conf_c = (
+            COLORS["success"]
+            if conf >= 80
+            else COLORS["warning"]
+            if conf >= 60
+            else COLORS["error"]
+        )
 
         col_info, col_btn = st.columns([5, 1])
         with col_info:
@@ -817,9 +882,11 @@ def render_submission(submission_id: str) -> None:
                 st.session_state["selected_incident"] = iid
                 st.rerun()
 
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-st.markdown(f"""
+st.markdown(
+    f"""
 <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;padding:20px 0 12px">
   <div style="width:52px;height:52px;border-radius:14px;flex-shrink:0;
               background:rgba(127,157,181,0.1);border:1px solid rgba(127,157,181,0.2);
@@ -837,11 +904,13 @@ st.markdown(f"""
     </div>
   </div>
 </div>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
-api_key_set  = bool(st.session_state.get("api_key"))
+api_key_set = bool(st.session_state.get("api_key"))
 submission_id = st.session_state.get("submission_id", "")
-selected_inc  = st.session_state.get("selected_incident")
+selected_inc = st.session_state.get("selected_incident")
 
 if not api_key_set:
     st.warning("Enter your API key in the sidebar to get started.")
@@ -851,7 +920,8 @@ elif submission_id:
     render_submission(submission_id)
 else:
     # Landing state
-    st.markdown("""
+    st.markdown(
+        """
 <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
 min-height:55vh;text-align:center;gap:20px">
   <div style="font-size:4rem;opacity:.25">🔍</div>
@@ -863,4 +933,6 @@ min-height:55vh;text-align:center;gap:20px">
     </p>
   </div>
 </div>
-""", unsafe_allow_html=True)
+""",
+        unsafe_allow_html=True,
+    )

@@ -175,7 +175,5 @@ async def test_no_auth_returns_401(client_valid: AsyncClient):
 
 async def test_invalid_query_param_returns_401(client_empty: AsyncClient):
     """Invalid ?api_key= value → 401."""
-    response = await client_empty.get(
-        "/api/v1/submissions/test-sub/stream?api_key=wrong-key"
-    )
+    response = await client_empty.get("/api/v1/submissions/test-sub/stream?api_key=wrong-key")
     assert response.status_code == 401

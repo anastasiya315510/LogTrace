@@ -74,19 +74,19 @@ async def start_demo(
 
 _SCENARIO_SEQUENCES = {
     "pool_exhaustion": [
-        {"service": "payment-service", "delay_seconds": 0,   "error_type": "PoolTimeoutError"},
-        {"service": "order-service",   "delay_seconds": 1.2, "error_type": "UpstreamTimeoutError"},
-        {"service": "api-gateway",     "delay_seconds": 2.8, "error_type": "ServiceUnavailableError"},
+        {"service": "payment-service", "delay_seconds": 0, "error_type": "PoolTimeoutError"},
+        {"service": "order-service", "delay_seconds": 1.2, "error_type": "UpstreamTimeoutError"},
+        {"service": "api-gateway", "delay_seconds": 2.8, "error_type": "ServiceUnavailableError"},
     ],
     "memory_leak": [
-        {"service": "payment-service", "delay_seconds": 0,   "error_type": "OutOfMemoryError"},
-        {"service": "order-service",   "delay_seconds": 2.0, "error_type": "HighLatencyError"},
-        {"service": "api-gateway",     "delay_seconds": 4.0, "error_type": "GatewayTimeoutError"},
+        {"service": "payment-service", "delay_seconds": 0, "error_type": "OutOfMemoryError"},
+        {"service": "order-service", "delay_seconds": 2.0, "error_type": "HighLatencyError"},
+        {"service": "api-gateway", "delay_seconds": 4.0, "error_type": "GatewayTimeoutError"},
     ],
     "slow_query": [
-        {"service": "payment-service", "delay_seconds": 0,   "error_type": "DeadlockError"},
-        {"service": "order-service",   "delay_seconds": 1.5, "error_type": "LockWaitTimeoutError"},
-        {"service": "api-gateway",     "delay_seconds": 3.5, "error_type": "ServiceDegradedError"},
+        {"service": "payment-service", "delay_seconds": 0, "error_type": "DeadlockError"},
+        {"service": "order-service", "delay_seconds": 1.5, "error_type": "LockWaitTimeoutError"},
+        {"service": "api-gateway", "delay_seconds": 3.5, "error_type": "ServiceDegradedError"},
     ],
 }
 

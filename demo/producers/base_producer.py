@@ -144,7 +144,12 @@ class BaseProducer(ABC):
             elif command == "cascade":
                 trace_id = cmd.get("trace_id", uuid.uuid4().hex)
                 scenario = cmd.get("scenario", "pool_exhaustion")
-                log.info("producer_cmd_cascade", service=self.service_name, scenario=scenario, trace_id=trace_id)
+                log.info(
+                    "producer_cmd_cascade",
+                    service=self.service_name,
+                    scenario=scenario,
+                    trace_id=trace_id,
+                )
                 _tasks.append(asyncio.create_task(self.run_cascade(trace_id, scenario)))
 
             elif command == "stop":

@@ -148,7 +148,7 @@ def parse_ultra_response(
     if match:
         # JSON-first format: explanation is the prose AFTER the closing tag.
         # Fall back to text before the block for legacy responses.
-        after = full_text[match.end():].strip()
+        after = full_text[match.end() :].strip()
         before = full_text[: match.start()].strip()
         cascade_explanation = after if after else before
         try:
@@ -170,7 +170,9 @@ def parse_ultra_response(
                 incident_id=str(incident_id),
                 root_cause_service=root_cause_service,
                 confidence_score=confidence_score,
-                cascade_chain_len=len(cascade_chain_json) if isinstance(cascade_chain_json, list) else cascade_chain_json,
+                cascade_chain_len=len(cascade_chain_json)
+                if isinstance(cascade_chain_json, list)
+                else cascade_chain_json,
                 has_hypotheses=bool(alternative_hypotheses_json),
             )
         except Exception as exc:
@@ -203,8 +205,11 @@ def parse_ultra_response(
                     cascade_chain_json = raw_chain if isinstance(raw_chain, list) else None
                     alternative_hypotheses_json = data.get("alternative_hypotheses")
                     parsed_partial = True
-                    log.info("ultra_json_partial_parsed", incident_id=str(incident_id),
-                             root_cause_service=root_cause_service)
+                    log.info(
+                        "ultra_json_partial_parsed",
+                        incident_id=str(incident_id),
+                        root_cause_service=root_cause_service,
+                    )
                     break
                 except Exception:
                     pass
@@ -212,8 +217,8 @@ def parse_ultra_response(
                 # Last resort: regex-extract individual scalar fields
                 for field, pat in [
                     ("root_cause_service", r'"root_cause_service"\s*:\s*"([^"]+)"'),
-                    ("root_cause_method",  r'"root_cause_method"\s*:\s*"([^"]+)"'),
-                    ("confidence_score",   r'"confidence_score"\s*:\s*([0-9.]+)'),
+                    ("root_cause_method", r'"root_cause_method"\s*:\s*"([^"]+)"'),
+                    ("confidence_score", r'"confidence_score"\s*:\s*([0-9.]+)'),
                 ]:
                     m = re.search(pat, partial)
                     if m:
@@ -229,8 +234,12 @@ def parse_ultra_response(
                             root_cause_service = val
                         elif field == "root_cause_method":
                             root_cause_method = val
-                log.warning("ultra_json_truncated_scalar_extract", incident_id=str(incident_id),
-                            root_cause_service=root_cause_service, confidence_score=confidence_score)
+                log.warning(
+                    "ultra_json_truncated_scalar_extract",
+                    incident_id=str(incident_id),
+                    root_cause_service=root_cause_service,
+                    confidence_score=confidence_score,
+                )
         else:
             # Last resort: model didn't use tags at all — extract the outermost JSON
             # object from the response (model outputs the data, just without the wrapper)
@@ -252,12 +261,19 @@ def parse_ultra_response(
                         "ultra_json_bare_parsed",
                         incident_id=str(incident_id),
                         root_cause_service=root_cause_service,
-                        cascade_chain_len=len(cascade_chain_json) if isinstance(cascade_chain_json, list) else None,
+                        cascade_chain_len=len(cascade_chain_json)
+                        if isinstance(cascade_chain_json, list)
+                        else None,
                     )
                 except Exception as exc:
-                    log.warning("ultra_json_bare_parse_failed", incident_id=str(incident_id), error=str(exc))
-                    log.warning("ultra_analysis_json_missing", incident_id=str(incident_id),
-                                response_tail=full_text[-500:] if len(full_text) > 500 else full_text)
+                    log.warning(
+                        "ultra_json_bare_parse_failed", incident_id=str(incident_id), error=str(exc)
+                    )
+                    log.warning(
+                        "ultra_analysis_json_missing",
+                        incident_id=str(incident_id),
+                        response_tail=full_text[-500:] if len(full_text) > 500 else full_text,
+                    )
             else:
                 log.warning(
                     "ultra_analysis_json_missing",
@@ -303,7 +319,7 @@ async def stream_rca(
                         "Your response MUST begin with a <ANALYSIS_JSON> block containing "
                         "a single JSON object with keys: root_cause_service, root_cause_method, "
                         "confidence_score (0.0-1.0), cascade_chain (array), alternative_hypotheses (array). "
-                        "Example: <ANALYSIS_JSON>{\"root_cause_service\": \"...\", ...}</ANALYSIS_JSON>\n"
+                        'Example: <ANALYSIS_JSON>{"root_cause_service": "...", ...}</ANALYSIS_JSON>\n'
                         "Output the JSON block FIRST, before any prose explanation."
                     ),
                 },

@@ -107,9 +107,7 @@ async def stream_submission_progress(
     # Redis pub/sub does not buffer — if __DONE__ was published before this
     # subscriber arrived, it is lost.  Detect that here and short-circuit.
     result = await db.execute(
-        select(Submission.raw_status).where(
-            Submission.submission_id == uuid.UUID(submission_id)
-        )
+        select(Submission.raw_status).where(Submission.submission_id == uuid.UUID(submission_id))
     )
     existing_status = result.scalar_one_or_none()
 
@@ -163,7 +161,9 @@ async def create_submission(
     if not files:
         raise HTTPException(status_code=422, detail="At least one file is required")
     if len(files) > cfg.upload_max_files:
-        raise HTTPException(status_code=422, detail=f"Maximum {cfg.upload_max_files} files per upload")
+        raise HTTPException(
+            status_code=422, detail=f"Maximum {cfg.upload_max_files} files per upload"
+        )
 
     total_size = sum(f.size for f in files if f.size is not None)
     if total_size > max_total_bytes:

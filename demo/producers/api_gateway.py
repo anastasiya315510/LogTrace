@@ -13,16 +13,16 @@ import random
 from demo.producers.base_producer import BaseProducer
 
 _NORMAL_MESSAGES = [
-    ("INFO",  "Request routed to order-service",       lambda: random.randint(1, 5)),
-    ("INFO",  "Request routed to payment-service",     lambda: random.randint(1, 4)),
-    ("INFO",  "Response 200 OK forwarded to client",   lambda: random.randint(100, 300)),
-    ("DEBUG", "Rate limit check passed",               lambda: random.randint(1, 3)),
-    ("INFO",  "Auth token validated",                  lambda: random.randint(5, 15)),
-    ("DEBUG", "Request logged to audit trail",         lambda: random.randint(1, 2)),
-    ("INFO",  "TLS handshake completed",               lambda: random.randint(10, 40)),
-    ("INFO",  "Keepalive connection reused",           lambda: random.randint(0, 2)),
-    ("DEBUG", "Load balancer selected backend-2",      lambda: random.randint(1, 3)),
-    ("INFO",  "Cache HIT for /products/featured",      lambda: random.randint(1, 5)),
+    ("INFO", "Request routed to order-service", lambda: random.randint(1, 5)),
+    ("INFO", "Request routed to payment-service", lambda: random.randint(1, 4)),
+    ("INFO", "Response 200 OK forwarded to client", lambda: random.randint(100, 300)),
+    ("DEBUG", "Rate limit check passed", lambda: random.randint(1, 3)),
+    ("INFO", "Auth token validated", lambda: random.randint(5, 15)),
+    ("DEBUG", "Request logged to audit trail", lambda: random.randint(1, 2)),
+    ("INFO", "TLS handshake completed", lambda: random.randint(10, 40)),
+    ("INFO", "Keepalive connection reused", lambda: random.randint(0, 2)),
+    ("DEBUG", "Load balancer selected backend-2", lambda: random.randint(1, 3)),
+    ("INFO", "Cache HIT for /products/featured", lambda: random.randint(1, 5)),
 ]
 
 # ── Scenario: pool_exhaustion ─────────────────────────────────────────────────
@@ -131,37 +131,52 @@ class ApiGatewayProducer(BaseProducer):
         await asyncio.sleep(2.8)
         for i, message in enumerate(_SERVICE_UNAVAILABLE_ERRORS):
             level = "WARN" if i < 2 else "ERROR"
-            await self.push([self.make_event(
-                level, message,
-                error_type="ServiceUnavailableError",
-                stack_trace=_SERVICE_UNAVAILABLE_STACK if i >= 2 else None,
-                trace_id=trace_id,
-                duration_ms=10_000,
-            )])
+            await self.push(
+                [
+                    self.make_event(
+                        level,
+                        message,
+                        error_type="ServiceUnavailableError",
+                        stack_trace=_SERVICE_UNAVAILABLE_STACK if i >= 2 else None,
+                        trace_id=trace_id,
+                        duration_ms=10_000,
+                    )
+                ]
+            )
             await asyncio.sleep(1.8)
 
     async def _run_gateway_timeout(self, trace_id: str) -> None:
         await asyncio.sleep(4.0)
         for i, message in enumerate(_GATEWAY_TIMEOUT_ERRORS):
             level = "WARN" if i < 3 else "ERROR"
-            await self.push([self.make_event(
-                level, message,
-                error_type="GatewayTimeoutError",
-                stack_trace=_GATEWAY_TIMEOUT_STACK if i >= 3 else None,
-                trace_id=trace_id,
-                duration_ms=random.randint(5000, 30_000),
-            )])
+            await self.push(
+                [
+                    self.make_event(
+                        level,
+                        message,
+                        error_type="GatewayTimeoutError",
+                        stack_trace=_GATEWAY_TIMEOUT_STACK if i >= 3 else None,
+                        trace_id=trace_id,
+                        duration_ms=random.randint(5000, 30_000),
+                    )
+                ]
+            )
             await asyncio.sleep(2.0)
 
     async def _run_service_degraded(self, trace_id: str) -> None:
         await asyncio.sleep(3.5)
         for i, message in enumerate(_SERVICE_DEGRADED_ERRORS):
             level = "WARN" if i < 3 else "ERROR"
-            await self.push([self.make_event(
-                level, message,
-                error_type="ServiceDegradedError",
-                stack_trace=_SERVICE_DEGRADED_STACK if i >= 2 else None,
-                trace_id=trace_id,
-                duration_ms=15_000,
-            )])
+            await self.push(
+                [
+                    self.make_event(
+                        level,
+                        message,
+                        error_type="ServiceDegradedError",
+                        stack_trace=_SERVICE_DEGRADED_STACK if i >= 2 else None,
+                        trace_id=trace_id,
+                        duration_ms=15_000,
+                    )
+                ]
+            )
             await asyncio.sleep(2.0)

@@ -13,16 +13,16 @@ import random
 from demo.producers.base_producer import BaseProducer
 
 _NORMAL_MESSAGES = [
-    ("INFO",  "Payment authorisation started",      lambda: random.randint(10, 30)),
-    ("INFO",  "Payment authorisation succeeded",     lambda: random.randint(80, 200)),
-    ("INFO",  "Card tokenisation completed",         lambda: random.randint(5, 15)),
-    ("DEBUG", "DB connection acquired from pool",    lambda: random.randint(1, 5)),
-    ("DEBUG", "DB connection released to pool",      lambda: random.randint(1, 3)),
-    ("INFO",  "Fraud check passed",                  lambda: random.randint(20, 60)),
-    ("INFO",  "Settlement batch enqueued",           lambda: random.randint(2, 8)),
-    ("INFO",  "Refund processed successfully",       lambda: random.randint(50, 120)),
-    ("DEBUG", "Idempotency key validated",           lambda: random.randint(1, 4)),
-    ("INFO",  "3DS challenge completed",             lambda: random.randint(300, 800)),
+    ("INFO", "Payment authorisation started", lambda: random.randint(10, 30)),
+    ("INFO", "Payment authorisation succeeded", lambda: random.randint(80, 200)),
+    ("INFO", "Card tokenisation completed", lambda: random.randint(5, 15)),
+    ("DEBUG", "DB connection acquired from pool", lambda: random.randint(1, 5)),
+    ("DEBUG", "DB connection released to pool", lambda: random.randint(1, 3)),
+    ("INFO", "Fraud check passed", lambda: random.randint(20, 60)),
+    ("INFO", "Settlement batch enqueued", lambda: random.randint(2, 8)),
+    ("INFO", "Refund processed successfully", lambda: random.randint(50, 120)),
+    ("DEBUG", "Idempotency key validated", lambda: random.randint(1, 4)),
+    ("INFO", "3DS challenge completed", lambda: random.randint(300, 800)),
 ]
 
 # ── Scenario: pool_exhaustion ─────────────────────────────────────────────────
@@ -138,35 +138,52 @@ class PaymentServiceProducer(BaseProducer):
     async def _run_pool_exhaustion(self, trace_id: str) -> None:
         for i, message in enumerate(_POOL_ERRORS):
             level = "WARN" if i < 3 else "ERROR"
-            await self.push([self.make_event(
-                level, message,
-                error_type="PoolTimeoutError",
-                stack_trace=_POOL_STACK if i >= 3 else None,
-                trace_id=trace_id,
-                duration_ms=30_000,
-            )])
+            await self.push(
+                [
+                    self.make_event(
+                        level,
+                        message,
+                        error_type="PoolTimeoutError",
+                        stack_trace=_POOL_STACK if i >= 3 else None,
+                        trace_id=trace_id,
+                        duration_ms=30_000,
+                    )
+                ]
+            )
             await asyncio.sleep(25 / len(_POOL_ERRORS))
 
     async def _run_memory_leak(self, trace_id: str) -> None:
         for i, message in enumerate(_MEMORY_ERRORS):
             level = "WARN" if i < 1 else "ERROR"
-            await self.push([self.make_event(
-                level, message,
-                error_type="OutOfMemoryError",
-                stack_trace=_MEMORY_STACK if i >= 5 else None,
-                trace_id=trace_id,
-                duration_ms=random.randint(1200, 8100) if "GC pause" in message else 100,
-            )])
+            await self.push(
+                [
+                    self.make_event(
+                        level,
+                        message,
+                        error_type="OutOfMemoryError",
+                        stack_trace=_MEMORY_STACK if i >= 5 else None,
+                        trace_id=trace_id,
+                        duration_ms=random.randint(1200, 8100) if "GC pause" in message else 100,
+                    )
+                ]
+            )
             await asyncio.sleep(28 / len(_MEMORY_ERRORS))
 
     async def _run_slow_query(self, trace_id: str) -> None:
         for i, message in enumerate(_DEADLOCK_ERRORS):
             level = "WARN" if i < 1 else "ERROR"
-            await self.push([self.make_event(
-                level, message,
-                error_type="DeadlockError",
-                stack_trace=_DEADLOCK_STACK if i >= 3 else None,
-                trace_id=trace_id,
-                duration_ms=random.randint(4200, 12300) if "Slow query" in message else 50_000,
-            )])
+            await self.push(
+                [
+                    self.make_event(
+                        level,
+                        message,
+                        error_type="DeadlockError",
+                        stack_trace=_DEADLOCK_STACK if i >= 3 else None,
+                        trace_id=trace_id,
+                        duration_ms=random.randint(4200, 12300)
+                        if "Slow query" in message
+                        else 50_000,
+                    )
+                ]
+            )
             await asyncio.sleep(25 / len(_DEADLOCK_ERRORS))

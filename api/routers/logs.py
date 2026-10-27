@@ -8,6 +8,7 @@ from db.models import ApiKey
 
 router = APIRouter()
 
+
 @router.get("/logs/services")
 async def list_services(
     redis: Redis = Depends(get_redis),

@@ -13,16 +13,16 @@ import random
 from demo.producers.base_producer import BaseProducer
 
 _NORMAL_MESSAGES = [
-    ("INFO",  "Order created",                          lambda: random.randint(20, 60)),
-    ("INFO",  "Order confirmed",                        lambda: random.randint(30, 80)),
-    ("INFO",  "Order dispatched to fulfillment",        lambda: random.randint(10, 25)),
-    ("INFO",  "Inventory reserved successfully",        lambda: random.randint(5, 20)),
-    ("DEBUG", "Payment gateway call initiated",         lambda: random.randint(1, 5)),
-    ("INFO",  "Payment gateway responded OK",           lambda: random.randint(90, 250)),
-    ("INFO",  "Order status updated to PAID",           lambda: random.randint(5, 15)),
-    ("INFO",  "Customer notification sent",             lambda: random.randint(50, 150)),
+    ("INFO", "Order created", lambda: random.randint(20, 60)),
+    ("INFO", "Order confirmed", lambda: random.randint(30, 80)),
+    ("INFO", "Order dispatched to fulfillment", lambda: random.randint(10, 25)),
+    ("INFO", "Inventory reserved successfully", lambda: random.randint(5, 20)),
+    ("DEBUG", "Payment gateway call initiated", lambda: random.randint(1, 5)),
+    ("INFO", "Payment gateway responded OK", lambda: random.randint(90, 250)),
+    ("INFO", "Order status updated to PAID", lambda: random.randint(5, 15)),
+    ("INFO", "Customer notification sent", lambda: random.randint(50, 150)),
     ("DEBUG", "Cart cleared after successful checkout", lambda: random.randint(2, 8)),
-    ("INFO",  "Return request accepted",                lambda: random.randint(10, 30)),
+    ("INFO", "Return request accepted", lambda: random.randint(10, 30)),
 ]
 
 # ── Scenario: pool_exhaustion ─────────────────────────────────────────────────
@@ -127,37 +127,52 @@ class OrderServiceProducer(BaseProducer):
         await asyncio.sleep(1.2)
         for i, message in enumerate(_UPSTREAM_TIMEOUT_ERRORS):
             level = "WARN" if i < 2 else "ERROR"
-            await self.push([self.make_event(
-                level, message,
-                error_type="UpstreamTimeoutError",
-                stack_trace=_UPSTREAM_STACK if i >= 2 else None,
-                trace_id=trace_id,
-                duration_ms=5_000,
-            )])
+            await self.push(
+                [
+                    self.make_event(
+                        level,
+                        message,
+                        error_type="UpstreamTimeoutError",
+                        stack_trace=_UPSTREAM_STACK if i >= 2 else None,
+                        trace_id=trace_id,
+                        duration_ms=5_000,
+                    )
+                ]
+            )
             await asyncio.sleep(2.0)
 
     async def _run_high_latency(self, trace_id: str) -> None:
         await asyncio.sleep(2.0)
         for i, message in enumerate(_HIGH_LATENCY_ERRORS):
             level = "WARN" if i < 3 else "ERROR"
-            await self.push([self.make_event(
-                level, message,
-                error_type="HighLatencyError",
-                stack_trace=_HIGH_LATENCY_STACK if i >= 4 else None,
-                trace_id=trace_id,
-                duration_ms=random.randint(3800, 30_000),
-            )])
+            await self.push(
+                [
+                    self.make_event(
+                        level,
+                        message,
+                        error_type="HighLatencyError",
+                        stack_trace=_HIGH_LATENCY_STACK if i >= 4 else None,
+                        trace_id=trace_id,
+                        duration_ms=random.randint(3800, 30_000),
+                    )
+                ]
+            )
             await asyncio.sleep(2.5)
 
     async def _run_lock_wait(self, trace_id: str) -> None:
         await asyncio.sleep(1.5)
         for i, message in enumerate(_LOCK_WAIT_ERRORS):
             level = "WARN" if i < 2 else "ERROR"
-            await self.push([self.make_event(
-                level, message,
-                error_type="LockWaitTimeoutError",
-                stack_trace=_LOCK_WAIT_STACK if i >= 3 else None,
-                trace_id=trace_id,
-                duration_ms=random.randint(12_000, 50_000),
-            )])
+            await self.push(
+                [
+                    self.make_event(
+                        level,
+                        message,
+                        error_type="LockWaitTimeoutError",
+                        stack_trace=_LOCK_WAIT_STACK if i >= 3 else None,
+                        trace_id=trace_id,
+                        duration_ms=random.randint(12_000, 50_000),
+                    )
+                ]
+            )
             await asyncio.sleep(2.2)

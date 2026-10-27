@@ -269,7 +269,9 @@ class StreamProcessor:
                     stdout=log_fh,
                     stderr=log_fh,
                 )
-            log.info("stage1_dispatched", submission_id=str(submission_id), pid=proc.pid, log=log_path)
+            log.info(
+                "stage1_dispatched", submission_id=str(submission_id), pid=proc.pid, log=log_path
+            )
             # Fire-and-forget; the subprocess manages its own lifecycle
         except Exception:
             log.exception("stage1_dispatch_failed", submission_id=str(submission_id))

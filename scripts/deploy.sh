@@ -16,8 +16,18 @@ fi
 
 SSH_KEY="${VM_SSH_KEY_PATH:-$HOME/.ssh/id_ed25519}"
 SSH="ssh -i $SSH_KEY -o StrictHostKeyChecking=no $VM_USER@$VM_HOST"
+REPO_URL=$(git -C "$(dirname "$0")/.." remote get-url origin 2>/dev/null || echo "https://github.com/esty315/Nemotrace.git")
 
 echo "── Deploying to $VM_USER@$VM_HOST ──────────────────────"
+
+# Bootstrap repo on first deploy, then sync .env
+$SSH "REPO_URL='$REPO_URL'" bash <<'BOOTSTRAP'
+set -euo pipefail
+if [ ! -d ~/logtrace ]; then
+  echo "── First deploy: cloning repository ─────────────────────"
+  git clone "$REPO_URL" ~/logtrace
+fi
+BOOTSTRAP
 
 # Write .env to the VM (never touches git)
 echo "── Syncing .env ─────────────────────────────────────────"

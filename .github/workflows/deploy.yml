@@ -46,6 +46,11 @@ jobs:
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
             set -euo pipefail
+
+            echo "── Bootstrap: ensure repo exists ────────────"
+            if [ ! -d ~/logtrace ]; then
+              git clone ${{ github.server_url }}/${{ github.repository }}.git ~/logtrace
+            fi
             cd ~/logtrace
 
             echo "── Pulling latest code ──────────────────────"

@@ -51,6 +51,7 @@ docker compose -f docker-compose.prod.yml run --rm api alembic upgrade head
 
 echo "── Restarting services ──────────────────────────────────"
 docker compose -f docker-compose.prod.yml up -d --force-recreate
+docker compose -f docker-compose.prod.yml --profile demo up -d demo-producers
 
 echo "── Done ─────────────────────────────────────────────────"
 REMOTE

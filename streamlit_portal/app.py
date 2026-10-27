@@ -4,18 +4,17 @@ Real-time incident monitoring, service topology visualisation, and PDF report ex
 """
 from __future__ import annotations
 
-import io
-import time
-from datetime import datetime, timezone
-from pathlib import Path
-from textwrap import dedent
-
 import base64 as _b64
+import io
 import os
+import time
+from datetime import datetime
+from pathlib import Path
+
 import requests
 import streamlit as st
-from streamlit_agraph import Config, Edge, Node, agraph
 from fpdf import FPDF
+from streamlit_agraph import Config, Edge, Node, agraph
 
 # ── Logo (loaded once, reused everywhere) ─────────────────────────────────────
 _HERE = Path(__file__).parent
@@ -184,7 +183,7 @@ def fmt_dt(iso: str | None) -> str:
         return "—"
     try:
         dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
-        return dt.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        return dt.astimezone(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
     except Exception:
         return iso
 
@@ -322,7 +321,7 @@ def _wrap(text: str, max_token: int = 70) -> str:
 def render_pdf(incident: dict, incident_id: str) -> bytes:
     """Generate a PDF report using fpdf2 (no external renderer needed)."""
     conf_pct   = confidence_pct(incident.get("confidence_score"))
-    now        = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    now        = datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M UTC")
     cascade    = incident.get("cascade_chain") or []
     fixes      = incident.get("fix_suggestions") or []
     alts       = incident.get("alternative_hypotheses") or []
@@ -405,17 +404,23 @@ def render_pdf(incident: dict, incident_id: str) -> bytes:
             continue
         # Headings
         if line.startswith("### "):
-            pdf.set_font("Helvetica", "B", 10); pdf.set_text_color(17, 24, 39)
+            pdf.set_font("Helvetica", "B", 10)
+            pdf.set_text_color(17, 24, 39)
             pdf.multi_cell(0, 5, _wrap(_safe(line[4:])), new_x="LMARGIN", new_y="NEXT")
-            pdf.set_font("Helvetica", "", 9); pdf.set_text_color(55, 65, 81)
+            pdf.set_font("Helvetica", "", 9)
+            pdf.set_text_color(55, 65, 81)
         elif line.startswith("## "):
-            pdf.set_font("Helvetica", "B", 11); pdf.set_text_color(17, 24, 39)
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.set_text_color(17, 24, 39)
             pdf.multi_cell(0, 6, _wrap(_safe(line[3:])), new_x="LMARGIN", new_y="NEXT")
-            pdf.set_font("Helvetica", "", 9); pdf.set_text_color(55, 65, 81)
+            pdf.set_font("Helvetica", "", 9)
+            pdf.set_text_color(55, 65, 81)
         elif line.startswith("# "):
-            pdf.set_font("Helvetica", "B", 13); pdf.set_text_color(17, 24, 39)
+            pdf.set_font("Helvetica", "B", 13)
+            pdf.set_text_color(17, 24, 39)
             pdf.multi_cell(0, 7, _wrap(_safe(line[2:])), new_x="LMARGIN", new_y="NEXT")
-            pdf.set_font("Helvetica", "", 9); pdf.set_text_color(55, 65, 81)
+            pdf.set_font("Helvetica", "", 9)
+            pdf.set_text_color(55, 65, 81)
         elif line.startswith("|"):
             # Skip markdown tables (complex to render)
             continue
@@ -455,9 +460,11 @@ def render_pdf(incident: dict, incident_id: str) -> bytes:
             conf_str = f" ({round(raw_c * 100 if raw_c and raw_c <= 1 else raw_c)}% likely)" if raw_c else ""
             pdf.multi_cell(0, 5, _safe(f"{i}. {hyp_text}{conf_str}"), new_x="LMARGIN", new_y="NEXT")
             if isinstance(h, dict) and h.get("reason"):
-                pdf.set_font("Helvetica", "", 8); pdf.set_text_color(107, 114, 128)
+                pdf.set_font("Helvetica", "", 8)
+                pdf.set_text_color(107, 114, 128)
                 pdf.multi_cell(0, 4, _wrap(_safe(f"   {h['reason']}")), new_x="LMARGIN", new_y="NEXT")
-                pdf.set_font("Helvetica", "", 9); pdf.set_text_color(55, 65, 81)
+                pdf.set_font("Helvetica", "", 9)
+                pdf.set_text_color(55, 65, 81)
             pdf.ln(1)
 
     # ── Footer ──
@@ -600,9 +607,9 @@ def render_incident(incident_id: str) -> None:
     if rca_text:
         with st.container():
             st.markdown(
-                f'<div style="background:#292E32;border:1px solid rgba(227,229,226,0.08);'
-                f'border-radius:12px;padding:20px 24px;line-height:1.8;color:rgba(227,229,226,0.85)">'
-                f'</div>',
+                '<div style="background:#292E32;border:1px solid rgba(227,229,226,0.08);'
+                'border-radius:12px;padding:20px 24px;line-height:1.8;color:rgba(227,229,226,0.85)">'
+                '</div>',
                 unsafe_allow_html=True,
             )
             st.markdown(rca_text)
@@ -699,7 +706,7 @@ def render_incident(incident_id: str) -> None:
         except Exception as e:
             st.warning(f"PDF generation failed: {e}")
             # Fallback: build markdown locally from the already-loaded incident dict
-            now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+            now = datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
             lines = [
                 "# NemoTrace Incident Report",
                 f"\n**Generated:** {now}  ",
@@ -747,8 +754,8 @@ def render_submission(submission_id: str) -> None:
     count  = sub.get("incident_count", 0)
 
     st.markdown(
-        f'<h2 style="color:#E3E5E2;font-size:1.5rem;font-weight:800;margin-bottom:4px">'
-        f'Submission</h2>',
+        '<h2 style="color:#E3E5E2;font-size:1.5rem;font-weight:800;margin-bottom:4px">'
+        'Submission</h2>',
         unsafe_allow_html=True,
     )
     c1, c2, c3 = st.columns(3)

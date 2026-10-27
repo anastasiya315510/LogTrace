@@ -30,6 +30,7 @@ tavily-python==0.5.0     # Tavily Search API — dual-query fix suggestions (rem
 streamlit==1.39.0        # web dashboard for the investigation portal UI
 streamlit-agraph==0.0.45 # force-directed topology graph (service dependency visualisation)
 weasyprint==62.3         # HTML→PDF export of incident reports
+fpdf2==2.7.9             # PDF generation for Streamlit incident report export
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 structlog==24.4.0        # structured JSON logging with bound context

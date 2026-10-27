@@ -6,6 +6,8 @@ LogTrace ingests raw log streams from your services, automatically detects anoma
 
 Built for the [NVIDIA × Nebius Global AI Hackathon](https://nebius.com/hackathon) — **Best Apps and Agents Track**.
 
+> **Live demo:** http://213.239.185.42/portal — use `dev-demo-key` as the API key.
+
 ---
 
 ## How It Uses NVIDIA + Nebius
@@ -139,22 +141,28 @@ All endpoints require `X-API-Key` header.
 pytest tests/unit/ -v
 ```
 
-40 unit tests, zero external dependencies required (in-process fakes for Redis and DB).
+45 unit tests, zero external dependencies required (in-process fakes for Redis and DB).
 
 ---
 
 ## Deployment on Nebius
 
-For a production deployment on Nebius AI Cloud:
+For a production deployment on a Nebius VM:
 
 ```bash
-# On a Nebius VM with Docker installed:
-git clone <this-repo>
-cd logtrace
-cp .env.example .env  # fill in your keys
-docker compose up -d
+# From your local machine — reads VM_HOST, VM_USER, VM_SSH_KEY_PATH from .env
+bash scripts/deploy.sh
+```
 
-# The portal is live at http://<vm-public-ip>:8000/portal
+This will clone the repo on the VM (first run), sync `.env`, build Docker images, run migrations, and restart all services. The portal is served at `http://<vm-public-ip>/portal` via nginx.
+
+Manual deploy:
+
+```bash
+git clone https://github.com/anastasiya315510/LogTrace.git
+cd LogTrace
+cp .env.example .env  # fill in your keys
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 The API and stream processor are co-located in Docker Compose. For higher scale, the API can be deployed to Nebius Serverless Endpoints and the Stage-1/Stage-2 jobs can be dispatched as Nebius Serverless Jobs.

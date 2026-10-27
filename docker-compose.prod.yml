@@ -99,7 +99,7 @@ services:
     environment:
       INGEST_URL: http://api:8000/api/v1/ingest
       DEMO_API_KEY: ${DEMO_API_KEY}
-      REDIS_URL: ${REDIS_URL}
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       api:
         condition: service_healthy

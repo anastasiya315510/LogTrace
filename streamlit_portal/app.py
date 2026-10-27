@@ -9,7 +9,7 @@ import base64 as _b64
 import io
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
@@ -762,7 +762,7 @@ def render_incident(incident_id: str) -> None:
         except Exception as e:
             st.warning(f"PDF generation failed: {e}")
             # Fallback: build markdown locally from the already-loaded incident dict
-            now = datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
+            now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
             lines = [
                 "# LogTrace Incident Report",
                 f"\n**Generated:** {now}  ",

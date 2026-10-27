@@ -7,23 +7,26 @@ from __future__ import annotations
 import io
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 from textwrap import dedent
 
 import base64 as _b64
+import os
 import requests
 import streamlit as st
 from streamlit_agraph import Config, Edge, Node, agraph
 from fpdf import FPDF
 
 # ── Logo (loaded once, reused everywhere) ─────────────────────────────────────
-with open("/home/esty/PycharmProjects/Nemotrace/streamlit_portal/icon.svg", "rb") as _f:
+_HERE = Path(__file__).parent
+with open(_HERE / "icon.svg", "rb") as _f:
     _logo_b64 = _b64.b64encode(_f.read()).decode()
 
 # ── Page config ───────────────────────────────────────────────────────────────
 
 st.set_page_config(
     page_title="NemoTrace",
-    page_icon="/home/esty/PycharmProjects/Nemotrace/streamlit_portal/icon.svg",
+    page_icon=str(_HERE / "icon.svg"),
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -145,7 +148,7 @@ st.markdown("""
 
 def api(method: str, path: str, **kwargs) -> dict | None:
     """Make an authenticated API call; return parsed JSON or None on error."""
-    base   = st.session_state.get("base_url", "http://localhost:8000").rstrip("/")
+    base   = st.session_state.get("base_url", os.environ.get("API_BASE_URL", "http://localhost:8000")).rstrip("/")
     api_key = st.session_state.get("api_key", "")
     try:
         resp = requests.request(
@@ -227,7 +230,7 @@ with st.sidebar:
     )
     st.session_state["base_url"] = st.text_input(
         "API Base URL",
-        value=st.session_state.get("base_url", "http://localhost:8000"),
+        value=st.session_state.get("base_url", os.environ.get("API_BASE_URL", "http://localhost:8000")),
     )
     st.divider()
 

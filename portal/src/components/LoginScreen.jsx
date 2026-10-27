@@ -41,7 +41,7 @@ export default function LoginScreen({ onLogin }) {
             className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-5"
             style={{ background: 'rgba(127,157,181,0.1)', border: '1px solid rgba(127,157,181,0.2)', boxShadow: '0 4px 28px rgba(127,157,181,0.18)' }}
           >
-            <img src="/icon.svg" alt="LogTrace" style={{ width: 36, height: 36 }} />
+            <img src="icon.svg" alt="LogTrace" style={{ width: 36, height: 36 }} />
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: 'var(--text)' }}>
             LogTrace

@@ -50,7 +50,7 @@ echo "── Running migrations ────────────────
 docker compose -f docker-compose.prod.yml run --rm api alembic upgrade head
 
 echo "── Restarting services ──────────────────────────────────"
-docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d --force-recreate
 
 echo "── Done ─────────────────────────────────────────────────"
 REMOTE

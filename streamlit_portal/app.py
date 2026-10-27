@@ -9,7 +9,7 @@ import base64 as _b64
 import io
 import os
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import requests
@@ -191,7 +191,7 @@ def fmt_dt(iso: str | None) -> str:
         return "—"
     try:
         dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
-        return dt.astimezone(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
+        return dt.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
     except Exception:
         return iso
 
@@ -335,7 +335,7 @@ def _wrap(text: str, max_token: int = 70) -> str:
 def render_pdf(incident: dict, incident_id: str) -> bytes:
     """Generate a PDF report using fpdf2 (no external renderer needed)."""
     conf_pct = confidence_pct(incident.get("confidence_score"))
-    now = datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M UTC")
+    now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
     cascade = incident.get("cascade_chain") or []
     fixes = incident.get("fix_suggestions") or []
     alts = incident.get("alternative_hypotheses") or []
@@ -762,7 +762,7 @@ def render_incident(incident_id: str) -> None:
         except Exception as e:
             st.warning(f"PDF generation failed: {e}")
             # Fallback: build markdown locally from the already-loaded incident dict
-            now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+            now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
             lines = [
                 "# LogTrace Incident Report",
                 f"\n**Generated:** {now}  ",

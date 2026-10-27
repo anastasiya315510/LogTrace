@@ -44,7 +44,7 @@ echo "── Pulling latest code ───────────────�
 git pull origin main
 
 echo "── Building images ──────────────────────────────────────"
-docker compose -f docker-compose.prod.yml build
+docker compose -f docker-compose.prod.yml build --no-cache
 
 echo "── Running migrations ───────────────────────────────────"
 docker compose -f docker-compose.prod.yml run --rm api alembic upgrade head
